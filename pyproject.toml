@@ -25,6 +25,7 @@ dev = [
 
 [project.scripts]
 grocery-init-db = "grocery_optimizer.scripts.init_db:main"
+grocery-kroger-keytest = "grocery_optimizer.scripts.kroger_key_test:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/grocery_optimizer"]
