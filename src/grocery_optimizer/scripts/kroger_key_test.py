@@ -18,6 +18,8 @@ Usage::
 
 from __future__ import annotations
 
+import sys
+
 from ..bronze.kroger import KrogerAuthError, KrogerClient
 from ..bronze.manifest import save_artifact
 from ..config import get_kroger_credentials
@@ -25,12 +27,16 @@ from ..db import get_connection
 
 # DC-metro ZIPs where Harris Teeter has a strong presence.
 DC_METRO_ZIPS = ["20009", "22201", "20814"]  # DC (Dupont), Arlington VA, Bethesda MD
-HT_CANON = "HARRISTEETER"
+# Kroger's location API returns Harris Teeter as the 4-letter chain code "HART"
+# (not "HARRISTEETER"); also match on the store name as a safety net.
+HT_CHAIN_CODE = "HART"
 PROBE_TERM = "milk"
 
 
-def _norm_chain(chain: str) -> str:
-    return (chain or "").upper().replace(" ", "").replace("-", "")
+def _is_harris_teeter(loc: dict) -> bool:
+    chain = (loc.get("chain") or "").upper()
+    name = (loc.get("name") or "").upper()
+    return chain == HT_CHAIN_CODE or "HARRIS TEETER" in name
 
 
 def _print_missing_credentials() -> None:
@@ -45,6 +51,13 @@ def _print_missing_credentials() -> None:
 
 
 def main() -> None:
+    # Product descriptions contain trademark symbols; render them cleanly on
+    # Windows consoles instead of mojibake (bronze already stores UTF-8).
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
     client_id, client_secret = get_kroger_credentials()
     if not client_id or not client_secret:
         _print_missing_credentials()
@@ -90,7 +103,7 @@ def main() -> None:
                 for loc in data:
                     chain = loc.get("chain", "?")
                     chains_seen[chain] = chains_seen.get(chain, 0) + 1
-                    if _norm_chain(chain) == HT_CANON:
+                    if _is_harris_teeter(loc):
                         ht_locations.append(loc)
                 print(
                     f"  zip {zip_code}: {len(data)} locations "
@@ -100,7 +113,7 @@ def main() -> None:
             # Report chains seen.
             print("\nChains/banners seen near DC metro:")
             for chain, count in sorted(chains_seen.items(), key=lambda x: -x[1]):
-                marker = "  <-- Harris Teeter" if _norm_chain(chain) == HT_CANON else ""
+                marker = "  <-- Harris Teeter" if chain.upper() == HT_CHAIN_CODE else ""
                 print(f"  {count:>3}  {chain}{marker}")
 
             # Verdict.
