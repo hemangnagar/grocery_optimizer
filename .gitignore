@@ -1,0 +1,16 @@
+# Secrets — never commit (this machine also runs trading bots with API keys)
+.env
+
+# The data moat — raw bronze, DuckDB, harvested price history all stay dark
+/data/
+*.duckdb
+*.duckdb.wal
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual env
+.venv/
