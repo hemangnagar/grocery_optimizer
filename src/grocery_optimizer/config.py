@@ -36,6 +36,10 @@ load_dotenv(_ENV_PATH, override=False)
 HOME_ZIP = os.environ.get("HOME_ZIP", "22180")  # Vienna, VA
 SEARCH_RADIUS_MILES = int(os.environ.get("SEARCH_RADIUS_MILES", "5"))
 
+# Whole Foods store id for the home area (Vienna, VA). WFM's site resolves this
+# from geolocation; we pin it in config for the deterministic pull.
+WFM_STORE_ID = os.environ.get("WFM_STORE_ID", "10065")
+
 
 def ensure_dirs() -> None:
     """Create the data directories if they do not exist."""

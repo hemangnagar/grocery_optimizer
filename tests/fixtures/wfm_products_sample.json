@@ -1,0 +1,26 @@
+{
+  "breadcrumb": [
+    {"label": "Products", "slug": "products"},
+    {"label": "Produce", "slug": "produce"}
+  ],
+  "results": [
+    {
+      "name": "Organic White Onion",
+      "brand": "PRODUCE",
+      "slug": "produce-organic-white-onion-b0787z3t3b",
+      "regularPrice": 3.19,
+      "uom": "lb",
+      "store": 10065
+    },
+    {
+      "name": "365 Organic Whole Milk",
+      "brand": "365",
+      "slug": "dairy-365-organic-whole-milk-abc123",
+      "regularPrice": 4.29,
+      "salePrice": 3.49,
+      "uom": "ea",
+      "store": 10065
+    }
+  ],
+  "meta": {}
+}

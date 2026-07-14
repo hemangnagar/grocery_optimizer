@@ -18,7 +18,7 @@ from .kcl import parse_deals
 from .units import unit_price
 
 # Per-source price confidence (feeds the gold >=0.85 trust gate).
-_SOURCE_CONFIDENCE = {"kroger": 0.99, "aldi_kcl": 0.80}
+_SOURCE_CONFIDENCE = {"kroger": 0.99, "wholefoods": 0.90, "aldi_kcl": 0.80}
 
 _TRADEMARK = re.compile(r"[®™©]")  # ® ™ ©
 _PARENS = re.compile(r"\([^)]*\)")
@@ -113,6 +113,49 @@ def parse_kcl_records(raw: bytes) -> list[dict]:
     return records
 
 
+def parse_wfm_products(raw: bytes) -> list[dict]:
+    """One record per Whole Foods product. Price is per unit-of-measure (uom),
+    so we express size as "1 <uom>" and let units.unit_price convert to a base."""
+    payload = json.loads(raw)
+    # Category from the breadcrumb (last labeled crumb), for match gating.
+    category = None
+    breadcrumb = payload.get("breadcrumb") or []
+    if isinstance(breadcrumb, list) and breadcrumb:
+        last = breadcrumb[-1]
+        if isinstance(last, dict):
+            category = last.get("label")
+
+    records: list[dict] = []
+    for product in payload.get("results", []):
+        regular = product.get("regularPrice")
+        sale = product.get("salePrice")
+        is_promo = bool(sale) and sale > 0 and (not regular or sale < regular)
+        price = sale if is_promo else regular
+        uom = product.get("uom")
+        up, unit = unit_price(price, f"1 {uom}" if uom else None)
+        discount_pct = (
+            round((regular - sale) / regular * 100) if is_promo and regular else None
+        )
+        records.append(
+            {
+                "source": "wholefoods",
+                "source_sku": product.get("slug"),
+                "raw_name": product.get("name"),
+                "raw_brand": product.get("brand"),
+                "raw_size_text": uom,
+                "category_hint": category,
+                "price": price,
+                "regular_price": regular if is_promo else None,
+                "unit_price": up,
+                "unit": unit,
+                "is_promo": is_promo,
+                "discount_pct": discount_pct,
+                "promo_text": None,
+            }
+        )
+    return records
+
+
 def _upsert_source_product(con, rec: dict, fetched_at, manifest_id: int) -> int:
     existing = None
     if rec["source_sku"]:
@@ -177,6 +220,7 @@ def _pending_manifests(con) -> list[dict]:
                 (source = 'kroger'
                  AND json_extract_string(request_params, '$.endpoint') = 'products')
              OR source = 'aldi_kcl'
+             OR source = 'wholefoods'
           )
         ORDER BY manifest_id
         """
@@ -190,7 +234,11 @@ def ingest_bronze(con: duckdb.DuckDBPyConnection) -> dict:
 
     Returns counts: ``{manifests, source_products, prices}``.
     """
-    parsers = {"kroger": parse_kroger_products, "aldi_kcl": parse_kcl_records}
+    parsers = {
+        "kroger": parse_kroger_products,
+        "aldi_kcl": parse_kcl_records,
+        "wholefoods": parse_wfm_products,
+    }
     counts = {"manifests": 0, "source_products": 0, "prices": 0}
 
     for manifest in _pending_manifests(con):

@@ -12,6 +12,7 @@ from grocery_optimizer.silver.normalize import (
     normalize_name,
     parse_kcl_records,
     parse_kroger_products,
+    parse_wfm_products,
 )
 from grocery_optimizer.silver.resolve import resolve_products
 from grocery_optimizer.silver.units import parse_size, unit_price
@@ -98,6 +99,28 @@ def test_parse_kcl_records():
     mand = by_name["Mandarins, 3 lb"]
     assert mand["unit_price"] == pytest.approx(2.99 / 48, abs=1e-4)  # 3 lb = 48 oz
     assert mand["unit"] == "$/oz"
+
+
+def test_parse_wfm_products():
+    raw = (FIXTURES / "wfm_products_sample.json").read_bytes()
+    recs = parse_wfm_products(raw)
+    assert len(recs) == 2
+
+    onion = recs[0]
+    assert onion["source"] == "wholefoods"
+    assert onion["source_sku"] == "produce-organic-white-onion-b0787z3t3b"
+    assert onion["category_hint"] == "Produce"  # from breadcrumb
+    assert onion["is_promo"] is False
+    # $3.19/lb normalized to $/oz
+    assert onion["unit"] == "$/oz"
+    assert onion["unit_price"] == pytest.approx(3.19 / 16, abs=1e-4)
+
+    milk = recs[1]  # has a salePrice below regular
+    assert milk["is_promo"] is True
+    assert milk["price"] == 3.49
+    assert milk["regular_price"] == 4.29
+    assert milk["discount_pct"] == 19
+    assert milk["unit"] == "$/ct"  # uom "ea"
 
 
 # ---- entity resolution -----------------------------------------------------
