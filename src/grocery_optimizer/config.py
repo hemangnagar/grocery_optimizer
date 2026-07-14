@@ -30,6 +30,13 @@ _ENV_PATH = PROJECT_ROOT / ".env"
 load_dotenv(_ENV_PATH, override=False)
 
 
+# User's home location. The store comparison set is constrained to stores within
+# SEARCH_RADIUS_MILES of HOME_ZIP — comparing prices across the whole metro is
+# meaningless if the user won't drive there. Personal, so overridable via .env.
+HOME_ZIP = os.environ.get("HOME_ZIP", "22180")  # Vienna, VA
+SEARCH_RADIUS_MILES = int(os.environ.get("SEARCH_RADIUS_MILES", "5"))
+
+
 def ensure_dirs() -> None:
     """Create the data directories if they do not exist."""
     BRONZE_DIR.mkdir(parents=True, exist_ok=True)

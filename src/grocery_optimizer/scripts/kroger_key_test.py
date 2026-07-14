@@ -1,13 +1,13 @@
-"""Kroger key test (Build Step 2): does the Kroger API expose Harris Teeter?
+"""Kroger key test (Build Step 2): what Kroger-family stores are in range, and
+does the API expose Harris Teeter with pricing?
 
-The Kroger Developer API is our gold-standard source, but Harris Teeter is a
-Kroger banner and it's unknown whether HT locations (and their location-filtered
-pricing) are reachable with a plain developer key. This script answers that:
+The Kroger Developer API is our gold-standard source. This script:
 
-  1. Verify OAuth2 client-credentials auth works.
-  2. Query store locations near several DC-metro ZIPs.
-  3. Report every chain/banner seen; flag whether Harris Teeter appears.
-  4. If HT appears, probe location-filtered product pricing for one HT store.
+  1. Verifies OAuth2 client-credentials auth works.
+  2. Queries stores within SEARCH_RADIUS_MILES of the user's HOME_ZIP — the
+     realistic comparison set (no point pricing a store you won't drive to).
+  3. Lists the in-range stores and flags Harris Teeter.
+  4. Probes location-filtered product pricing at the nearest in-range store.
 
 Every raw API response is preserved to bronze first (never parse-and-discard).
 
@@ -22,11 +22,9 @@ import sys
 
 from ..bronze.kroger import KrogerAuthError, KrogerClient
 from ..bronze.manifest import save_artifact
-from ..config import get_kroger_credentials
+from ..config import HOME_ZIP, SEARCH_RADIUS_MILES, get_kroger_credentials
 from ..db import get_connection
 
-# DC-metro ZIPs where Harris Teeter has a strong presence.
-DC_METRO_ZIPS = ["20009", "22201", "20814"]  # DC (Dupont), Arlington VA, Bethesda MD
 # Kroger's location API returns Harris Teeter as the 4-letter chain code "HART"
 # (not "HARRISTEETER"); also match on the store name as a safety net.
 HT_CHAIN_CODE = "HART"
@@ -37,6 +35,16 @@ def _is_harris_teeter(loc: dict) -> bool:
     chain = (loc.get("chain") or "").upper()
     name = (loc.get("name") or "").upper()
     return chain == HT_CHAIN_CODE or "HARRIS TEETER" in name
+
+
+def _fmt_store(loc: dict) -> str:
+    addr = loc.get("address", {})
+    return (
+        f"{loc.get('name')} [{loc.get('chain')}] "
+        f"(locationId {loc.get('locationId')})\n"
+        f"        {addr.get('addressLine1')}, "
+        f"{addr.get('city')} {addr.get('state')} {addr.get('zipCode')}"
+    )
 
 
 def _print_missing_credentials() -> None:
@@ -64,9 +72,6 @@ def main() -> None:
         return
 
     con = get_connection()
-    chains_seen: dict[str, int] = {}
-    ht_locations: list[dict] = []
-
     try:
         with KrogerClient(client_id, client_secret) as client:
             # 1. Auth check (raises KrogerAuthError on bad creds).
@@ -77,93 +82,72 @@ def main() -> None:
                 return
             print("Auth OK - token acquired.\n")
 
-            # 2 + 3. Locations sweep across DC-metro ZIPs.
-            print(f"Querying locations near ZIPs: {', '.join(DC_METRO_ZIPS)}")
-            for zip_code in DC_METRO_ZIPS:
-                resp = client.get_locations(zip_code, radius_miles=15)
-                manifest_id, path = save_artifact(
-                    con,
-                    source="kroger",
-                    source_kind="api",
-                    content=resp.content,
-                    request_url=str(resp.request.url),
-                    request_params={"zip": zip_code, "endpoint": "locations"},
-                    http_status=resp.status_code,
-                    content_type=resp.headers.get("content-type"),
-                    region=f"zip:{zip_code}",
-                    notes="step2 key test: locations",
-                )
-                if resp.status_code != 200:
-                    print(
-                        f"  zip {zip_code}: HTTP {resp.status_code} "
-                        f"(saved bronze manifest {manifest_id})"
-                    )
-                    continue
-                data = resp.json().get("data", [])
-                for loc in data:
-                    chain = loc.get("chain", "?")
-                    chains_seen[chain] = chains_seen.get(chain, 0) + 1
-                    if _is_harris_teeter(loc):
-                        ht_locations.append(loc)
-                print(
-                    f"  zip {zip_code}: {len(data)} locations "
-                    f"-> bronze {path.name} (manifest {manifest_id})"
-                )
+            # 2. Stores within the user's realistic driving radius.
+            print(
+                f"Stores within {SEARCH_RADIUS_MILES} miles of {HOME_ZIP} "
+                "(the comparison set):"
+            )
+            resp = client.get_locations(
+                HOME_ZIP, radius_miles=SEARCH_RADIUS_MILES, limit=50
+            )
+            manifest_id, path = save_artifact(
+                con,
+                source="kroger",
+                source_kind="api",
+                content=resp.content,
+                request_url=str(resp.request.url),
+                request_params={
+                    "zip": HOME_ZIP,
+                    "radius_miles": SEARCH_RADIUS_MILES,
+                    "endpoint": "locations",
+                },
+                http_status=resp.status_code,
+                content_type=resp.headers.get("content-type"),
+                region=f"zip:{HOME_ZIP}",
+                notes="step2 key test: in-range locations",
+            )
+            if resp.status_code != 200:
+                print(f"  HTTP {resp.status_code} (saved bronze manifest {manifest_id})")
+                return
 
-            # Report chains seen.
-            print("\nChains/banners seen near DC metro:")
-            for chain, count in sorted(chains_seen.items(), key=lambda x: -x[1]):
-                marker = "  <-- Harris Teeter" if chain.upper() == HT_CHAIN_CODE else ""
-                print(f"  {count:>3}  {chain}{marker}")
+            # API returns locations nearest-first.
+            locations = resp.json().get("data", [])
+            ht_locations = [loc for loc in locations if _is_harris_teeter(loc)]
 
-            # Verdict.
+            if not locations:
+                print("  (no Kroger-family stores in range)")
+            for loc in locations:
+                flag = "  <-- Harris Teeter" if _is_harris_teeter(loc) else ""
+                print(f"  {_fmt_store(loc)}{flag}")
+            print(f"\n  saved bronze {path.name} (manifest {manifest_id})")
+
+            # 3. Verdict.
             print("\n" + "=" * 60)
             if ht_locations:
-                print(f"RESULT: Harris Teeter IS exposed ({len(ht_locations)} locations).")
-                sample = ht_locations[0]
-                addr = sample.get("address", {})
                 print(
-                    f"  sample: {sample.get('name')} "
-                    f"(locationId {sample.get('locationId')})\n"
-                    f"          {addr.get('addressLine1')}, "
-                    f"{addr.get('city')} {addr.get('state')} {addr.get('zipCode')}"
+                    f"RESULT: {len(ht_locations)} Harris Teeter store(s) within "
+                    f"{SEARCH_RADIUS_MILES} mi of {HOME_ZIP}."
+                )
+            elif locations:
+                print(
+                    f"RESULT: No Harris Teeter within {SEARCH_RADIUS_MILES} mi of "
+                    f"{HOME_ZIP}, but {len(locations)} other Kroger-family store(s) are."
                 )
             else:
-                print("RESULT: Harris Teeter is NOT exposed by this key.")
-                print("  Fallback (per spec): use Kroger-banner stores as calibration data.")
+                print(
+                    f"RESULT: No Kroger-family stores within {SEARCH_RADIUS_MILES} mi "
+                    f"of {HOME_ZIP}. Try a larger radius or different ZIP."
+                )
             print("=" * 60)
 
-            # 4. Probe location-filtered pricing for one HT store (or fall back
-            #    to any store seen) to confirm pricing is reachable.
-            probe_loc = ht_locations[0] if ht_locations else None
-            if probe_loc is None:
-                # Fall back to the first store from the last successful response.
-                probe_loc = _first_any_location(con, client)
+            # 4. Probe pricing at the nearest in-range store (prefer an HT store).
+            probe_loc = ht_locations[0] if ht_locations else (
+                locations[0] if locations else None
+            )
             if probe_loc is not None:
                 _probe_pricing(con, client, probe_loc)
     finally:
         con.close()
-
-
-def _first_any_location(con, client: KrogerClient) -> dict | None:
-    """Grab any single location (for a pricing probe when no HT store exists)."""
-    resp = client.get_locations(DC_METRO_ZIPS[0], radius_miles=15, limit=1)
-    save_artifact(
-        con,
-        source="kroger",
-        source_kind="api",
-        content=resp.content,
-        request_url=str(resp.request.url),
-        request_params={"zip": DC_METRO_ZIPS[0], "endpoint": "locations", "limit": 1},
-        http_status=resp.status_code,
-        content_type=resp.headers.get("content-type"),
-        region=f"zip:{DC_METRO_ZIPS[0]}",
-        notes="step2 key test: fallback location for pricing probe",
-    )
-    if resp.status_code != 200:
-        return None
-    data = resp.json().get("data", [])
-    return data[0] if data else None
 
 
 def _probe_pricing(con, client: KrogerClient, loc: dict) -> None:
