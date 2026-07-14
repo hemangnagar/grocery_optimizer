@@ -4,10 +4,11 @@
 --
 -- Views are CREATE OR REPLACE so re-running init picks up definition changes.
 
--- Resolved, trusted prices for the current ad week (the most recent ad_week
--- present in prices). "Trusted" = the source product resolved to a canonical
--- product with match confidence at/above threshold; anything weaker sits in
--- resolution_queue and is excluded here, never surfaced to users.
+-- The latest trusted price per (source product, store). "Trusted" = the source
+-- product resolved to a canonical product with match confidence at/above
+-- threshold; anything weaker sits in resolution_queue and is excluded here,
+-- never surfaced to users. "Current" = most recent observation, so this works
+-- for both weekly-ad prices and regular (non-ad) prices.
 CREATE OR REPLACE VIEW gold_current_prices AS
 SELECT
     cp.canonical_id,
@@ -19,6 +20,7 @@ SELECT
     st.name              AS store_name,
     st.region            AS store_region,
     p.ad_week,
+    p.observed_at,
     p.price,
     p.regular_price,
     p.unit_price,
@@ -36,7 +38,10 @@ JOIN canonical_products cp ON cp.canonical_id = sp.canonical_id
 LEFT JOIN stores st ON st.source = p.source AND st.store_id = p.store_id
 WHERE sp.canonical_id IS NOT NULL
   AND sp.match_confidence >= 0.85
-  AND p.ad_week = (SELECT max(ad_week) FROM prices);
+QUALIFY row_number() OVER (
+    PARTITION BY p.source_product_id, p.store_id
+    ORDER BY p.observed_at DESC, p.price_id DESC
+) = 1;
 
 -- Cheapest source per canonical item this week (min canonical unit price).
 -- Ties broken deterministically by source then store for stable output.
@@ -45,7 +50,7 @@ SELECT *
 FROM gold_current_prices
 QUALIFY row_number() OVER (
     PARTITION BY canonical_id
-    ORDER BY unit_price ASC, source ASC, store_id ASC
+    ORDER BY unit_price ASC NULLS LAST, source ASC, store_id ASC
 ) = 1;
 
 -- NOTE: basket-optimization gold view is deferred to Build Step 6 (needs the

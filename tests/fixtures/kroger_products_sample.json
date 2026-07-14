@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "productId": "0001",
+      "brand": "Harris Teeter",
+      "categories": ["Dairy"],
+      "description": "Harris Teeter® Vitamin D Whole Milk",
+      "items": [{"price": {"regular": 3.99}, "size": "1 gal", "soldBy": "UNIT"}]
+    },
+    {
+      "productId": "0002",
+      "brand": "Simple Truth",
+      "categories": ["Natural & Organic", "Dairy"],
+      "description": "Simple Truth 2% Reduced Fat Milk",
+      "items": [{"price": {"regular": 4.99, "promo": 3.50}, "size": "1/2 gal", "soldBy": "UNIT"}]
+    }
+  ],
+  "meta": {}
+}

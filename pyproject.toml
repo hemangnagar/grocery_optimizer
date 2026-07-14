@@ -17,6 +17,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "anthropic>=0.40",
     "beautifulsoup4>=4.12",
+    "pytz>=2024.1",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +30,7 @@ grocery-init-db = "grocery_optimizer.scripts.init_db:main"
 grocery-kroger-keytest = "grocery_optimizer.scripts.kroger_key_test:main"
 grocery-lidl-probe = "grocery_optimizer.scripts.lidl_probe:main"
 grocery-kcl-fetch = "grocery_optimizer.scripts.kcl_fetch:main"
+grocery-normalize = "grocery_optimizer.scripts.normalize:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/grocery_optimizer"]
