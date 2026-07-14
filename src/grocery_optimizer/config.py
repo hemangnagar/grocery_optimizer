@@ -23,11 +23,12 @@ DB_PATH = DB_DIR / "grocery.duckdb"
 
 SQL_DIR = Path(__file__).resolve().parent / "sql"
 
-# Load .env from the project root. override=False so an already-set process env
-# still wins, but we never fall back to reading global user/system vars for
-# secrets ourselves (see get_secret).
+# Load .env from the project root with override=True so the project .env is
+# authoritative even if a global env var is set. CLAUDE.md requires secrets to
+# live ONLY in the per-project .env — this ensures a stray global ANTHROPIC_API_KEY
+# can't silently take over (and bill API rates) instead of the project's config.
 _ENV_PATH = PROJECT_ROOT / ".env"
-load_dotenv(_ENV_PATH, override=False)
+load_dotenv(_ENV_PATH, override=True)
 
 
 # User's home location. The store comparison set is constrained to stores within

@@ -35,6 +35,7 @@ grocery-wfm-fetch = "grocery_optimizer.scripts.wfm_fetch:main"
 grocery-kroger-fetch = "grocery_optimizer.scripts.kroger_fetch:main"
 grocery-tj-fetch = "grocery_optimizer.scripts.tj_fetch:main"
 grocery-optimize = "grocery_optimizer.scripts.optimize_basket:main"
+grocery-adjudicate = "grocery_optimizer.scripts.adjudicate:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/grocery_optimizer"]
