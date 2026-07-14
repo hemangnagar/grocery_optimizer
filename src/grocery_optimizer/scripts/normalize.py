@@ -12,7 +12,7 @@ import sys
 
 from ..db import get_connection, init_db
 from ..silver.normalize import ingest_bronze
-from ..silver.resolve import resolve_products
+from ..silver.resolve import reset_resolution, resolve_products
 
 
 def main() -> None:
@@ -21,9 +21,15 @@ def main() -> None:
     except (AttributeError, ValueError):
         pass
 
+    rebuild = "--rebuild" in sys.argv  # re-resolve all products from scratch
+
     con = get_connection()
     try:
         init_db(con)  # ensure schema + latest gold view definitions
+
+        if rebuild:
+            reset_resolution(con)
+            print("Reset resolution; re-resolving all source products.")
 
         ing = ingest_bronze(con)
         print(

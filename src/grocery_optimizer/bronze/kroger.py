@@ -139,11 +139,18 @@ class KrogerClient:
         *,
         location_id: str,
         limit: int = 10,
+        start: int = 0,
     ) -> httpx.Response:
-        """Products matching ``term`` with pricing for a specific location."""
+        """Products matching ``term`` with pricing for a specific location.
+
+        The Kroger API is search-based (no full-catalog dump): max 50 per page,
+        paginated via ``start`` up to a 250-result ceiling per term.
+        """
         params = {
             "filter.term": term,
             "filter.locationId": location_id,
             "filter.limit": limit,
         }
+        if start:
+            params["filter.start"] = start
         return self.get("/products", params)

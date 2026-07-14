@@ -40,6 +40,10 @@ SEARCH_RADIUS_MILES = int(os.environ.get("SEARCH_RADIUS_MILES", "5"))
 # from geolocation; we pin it in config for the deterministic pull.
 WFM_STORE_ID = os.environ.get("WFM_STORE_ID", "10065")
 
+# Kroger (Harris Teeter) location id for the home area. Nearest HT to 22180 is
+# Dunn Loring (Vienna). Discover others with grocery-kroger-keytest.
+KROGER_STORE_ID = os.environ.get("KROGER_STORE_ID", "09700308")
+
 
 def ensure_dirs() -> None:
     """Create the data directories if they do not exist."""

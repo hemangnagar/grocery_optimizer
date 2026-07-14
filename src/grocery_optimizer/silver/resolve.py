@@ -8,6 +8,12 @@ Deterministic first pass (per the spec, RapidFuzz handles the easy ~80%):
   - score < REVIEW_LOW                -> treat as a new distinct product and
                                          create a canonical for it
 
+Scoring uses ``token_sort_ratio`` rather than ``token_set_ratio``: the latter
+scores a short name as a 100% match against any longer name that contains it
+(the subset problem — "Banana" wrongly absorbing "Banana Nut Bread"), which
+pollutes gold. token_sort_ratio penalizes the extra tokens, so we err toward
+NOT merging (a separate canonical or the review queue) over a wrong merge.
+
 The below-AUTO band is where the LLM adjudicator agent will plug in later; for
 now those rows wait in the human-review queue.
 """
@@ -66,6 +72,20 @@ def _enqueue(con, spid: int, candidate_id: int, confidence: float, reason: str, 
     )
 
 
+def reset_resolution(con: duckdb.DuckDBPyConnection) -> None:
+    """Clear all resolution outputs so it can be rebuilt from source_products.
+
+    Canonical products and the review queue are fully derived from
+    source_products, so this is safe (bronze/prices are untouched).
+    """
+    con.execute("DELETE FROM resolution_queue")
+    con.execute(
+        "UPDATE source_products SET canonical_id = NULL, match_confidence = NULL, "
+        "match_method = NULL, resolved_at = NULL"
+    )
+    con.execute("DELETE FROM canonical_products")
+
+
 def resolve_products(
     con: duckdb.DuckDBPyConnection,
     *,
@@ -98,7 +118,7 @@ def resolve_products(
         for cid, cname, ccat in candidates:
             if category and ccat and category.lower() != ccat.lower():
                 continue
-            score = fuzz.token_set_ratio(norm, normalize_name(cname))
+            score = fuzz.token_sort_ratio(norm, normalize_name(cname))
             if score > best_score:
                 best_id, best_name, best_score = cid, cname, score
 

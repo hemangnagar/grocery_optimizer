@@ -32,6 +32,7 @@ grocery-lidl-probe = "grocery_optimizer.scripts.lidl_probe:main"
 grocery-kcl-fetch = "grocery_optimizer.scripts.kcl_fetch:main"
 grocery-normalize = "grocery_optimizer.scripts.normalize:main"
 grocery-wfm-fetch = "grocery_optimizer.scripts.wfm_fetch:main"
+grocery-kroger-fetch = "grocery_optimizer.scripts.kroger_fetch:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/grocery_optimizer"]
