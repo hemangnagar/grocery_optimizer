@@ -15,7 +15,7 @@ from . import config
 
 # Applied in order. Bronze first (manifest), then silver (products/prices),
 # then gold (views that read silver).
-SCHEMA_FILES = ("01_bronze.sql", "02_silver.sql", "03_gold.sql")
+SCHEMA_FILES = ("01_bronze.sql", "02_silver.sql", "03_gold.sql", "04_basket.sql")
 
 
 def get_connection(read_only: bool = False) -> duckdb.DuckDBPyConnection:
