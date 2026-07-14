@@ -12,6 +12,7 @@ from grocery_optimizer.silver.normalize import (
     normalize_name,
     parse_kcl_records,
     parse_kroger_products,
+    parse_tj_products,
     parse_wfm_products,
 )
 from grocery_optimizer.silver.resolve import resolve_products
@@ -121,6 +122,23 @@ def test_parse_wfm_products():
     assert milk["regular_price"] == 4.29
     assert milk["discount_pct"] == 19
     assert milk["unit"] == "$/ct"  # uom "ea"
+
+
+def test_parse_tj_products():
+    raw = (FIXTURES / "tj_products_sample.json").read_bytes()
+    recs = parse_tj_products(raw)
+    assert len(recs) == 2
+
+    crust = recs[0]
+    assert crust["source"] == "traderjoes"
+    assert crust["source_sku"] == "054225"
+    assert crust["price"] == 3.99
+    assert crust["category_hint"] == "Bakery"  # deepest hierarchy node
+    assert crust["unit"] == "$/oz"
+    assert crust["unit_price"] == pytest.approx(3.99 / 15, abs=1e-4)  # "15 Oz"
+
+    stilton = recs[1]
+    assert stilton["unit_price"] == pytest.approx(12.99 / 16, abs=1e-4)  # "1 Lb"
 
 
 # ---- entity resolution -----------------------------------------------------

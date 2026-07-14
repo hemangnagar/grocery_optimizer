@@ -1,0 +1,35 @@
+{
+  "data": {
+    "products": {
+      "items": [
+        {
+          "sku": "054225",
+          "item_title": "Pizza Crust",
+          "category_hierarchy": [
+            {"id": 2, "name": "Products"},
+            {"id": 8, "name": "Food"},
+            {"id": 11, "name": "Bakery"}
+          ],
+          "sales_size": 15,
+          "sales_uom_description": "Oz",
+          "retail_price": "3.99",
+          "price_range": {"minimum_price": {"final_price": {"currency": "USD", "value": 3.99}}}
+        },
+        {
+          "sku": "079590",
+          "item_title": "White Stilton Cheese with Mango & Ginger",
+          "category_hierarchy": [
+            {"id": 2, "name": "Products"},
+            {"id": 8, "name": "Food"},
+            {"id": 29, "name": "Cheese"}
+          ],
+          "sales_size": 1,
+          "sales_uom_description": "Lb",
+          "retail_price": "12.99",
+          "price_range": {"minimum_price": {"final_price": {"currency": "USD", "value": 12.99}}}
+        }
+      ],
+      "total_count": 2
+    }
+  }
+}

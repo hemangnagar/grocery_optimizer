@@ -18,7 +18,12 @@ from .kcl import parse_deals
 from .units import unit_price
 
 # Per-source price confidence (feeds the gold >=0.85 trust gate).
-_SOURCE_CONFIDENCE = {"kroger": 0.99, "wholefoods": 0.90, "aldi_kcl": 0.80}
+_SOURCE_CONFIDENCE = {
+    "kroger": 0.99,
+    "wholefoods": 0.90,
+    "traderjoes": 0.90,
+    "aldi_kcl": 0.80,
+}
 
 _TRADEMARK = re.compile(r"[®™©]")  # ® ™ ©
 _PARENS = re.compile(r"\([^)]*\)")
@@ -156,6 +161,48 @@ def parse_wfm_products(raw: bytes) -> list[dict]:
     return records
 
 
+def parse_tj_products(raw: bytes) -> list[dict]:
+    """One record per Trader Joe's product. Price is national retail_price;
+    size is sales_size + sales_uom_description (e.g. "15 Oz")."""
+    payload = json.loads(raw)
+    items = ((payload.get("data") or {}).get("products") or {}).get("items") or []
+    records: list[dict] = []
+    for it in items:
+        price = it.get("retail_price")
+        try:
+            price = float(price) if price is not None else None
+        except (TypeError, ValueError):
+            price = (
+                ((it.get("price_range") or {}).get("minimum_price") or {})
+                .get("final_price", {})
+                .get("value")
+            )
+        size = None
+        if it.get("sales_size") is not None and it.get("sales_uom_description"):
+            size = f"{it['sales_size']} {it['sales_uom_description']}"
+        up, unit = unit_price(price, size)
+        hierarchy = it.get("category_hierarchy") or []
+        category = hierarchy[-1]["name"] if hierarchy else None
+        records.append(
+            {
+                "source": "traderjoes",
+                "source_sku": str(it.get("sku")) if it.get("sku") else None,
+                "raw_name": it.get("item_title"),
+                "raw_brand": None,  # mostly private label
+                "raw_size_text": size,
+                "category_hint": category,
+                "price": price,
+                "regular_price": None,
+                "unit_price": up,
+                "unit": unit,
+                "is_promo": False,
+                "discount_pct": None,
+                "promo_text": None,
+            }
+        )
+    return records
+
+
 def _upsert_source_product(con, rec: dict, fetched_at, manifest_id: int) -> int:
     existing = None
     if rec["source_sku"]:
@@ -221,6 +268,7 @@ def _pending_manifests(con) -> list[dict]:
                  AND json_extract_string(request_params, '$.endpoint') = 'products')
              OR source = 'aldi_kcl'
              OR source = 'wholefoods'
+             OR source = 'traderjoes'
           )
         ORDER BY manifest_id
         """
@@ -238,6 +286,7 @@ def ingest_bronze(con: duckdb.DuckDBPyConnection) -> dict:
         "kroger": parse_kroger_products,
         "aldi_kcl": parse_kcl_records,
         "wholefoods": parse_wfm_products,
+        "traderjoes": parse_tj_products,
     }
     counts = {"manifests": 0, "source_products": 0, "prices": 0}
 
