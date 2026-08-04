@@ -60,7 +60,15 @@ core") are DONE and stay listed for history; v2 step numbering restarts at 2
   0.90-conf store-brand subs drop out) and Aldi is cheap-but-partial. Demo
   screenshots in `docs/screenshots/`, embedded in README. Tests: `tests/test_api.py`.
 - [ ] **6. Windows Task Scheduler job** — TODO (same as pre-pivot step 7).
-- [ ] **7. Parser self-healing agent + weekly narrator** — TODO.
+- [~] **7. Parser self-healing agent + weekly narrator** — **narrator DONE**
+  (`gold/narrator.py`, `grocery-narrate`): deterministic fact pack from the
+  verdict engine (every total/delta/count precomputed + gold price_id
+  provenance) -> LLM writes one paragraph -> hard audit gate rejects any
+  number not in the fact pack (raises, stores nothing) -> audited narration
+  stored in `narrations` with pipeline-appended citations. `/api/narrative`
+  + PWA serve ONLY stored rows (narrate once weekly, zero tokens per view).
+  `--facts-only` previews for free. Tests: `tests/test_narrator.py`.
+  Parser self-healing agent TODO.
 - [ ] **8. Showcase phase** — TODO.
 
 ## Coverage (in gold now)
@@ -79,10 +87,11 @@ uv run grocery-lidl-probe       # Lidl overview
 uv run grocery-normalize [--rebuild]   # bronze -> silver -> gold + resolve
 uv run grocery-adjudicate [--limit N]  # LLM entity adjudicator (spends API credits)
 uv run grocery-adjudicate-list [--limit N] [--dry-run]  # list-term adjudicator -> verdict cache
+uv run grocery-narrate [--facts-only]  # audited weekly narration -> narrations table + PWA
 uv run grocery-optimize         # synthetic basket -> single-store verdict (split as footnote)
 uv run grocery-seed-demo        # deterministic synthetic demo dataset (no creds)
 uv run grocery-serve            # FastAPI + verdict PWA on http://localhost:8177
-uv run pytest                   # 84 tests
+uv run pytest                   # 91 tests
 ```
 Latest run: no single in-range store covers all 26 items yet (thin cross-store
 recall, see limitation 3 below), so the split ($124.99 across 4 stores) is

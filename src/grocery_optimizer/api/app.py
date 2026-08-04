@@ -77,6 +77,37 @@ def create_app() -> FastAPI:
         finally:
             con.close()
 
+    @app.get("/api/narrative")
+    def narrative() -> dict:
+        """Latest stored, audit-passed narration for the latest basket.
+        Serving is read-only and cached-by-design: the narrator runs weekly
+        via grocery-narrate; this endpoint never triggers an LLM call."""
+        con = _connect()
+        try:
+            basket = _latest_basket(con)
+            if basket is None:
+                raise HTTPException(status_code=404, detail="No basket found.")
+            row = con.execute(
+                """
+                SELECT narration, citations, ad_week, model, created_at
+                FROM narrations
+                WHERE basket_id = ? AND audit_ok
+                ORDER BY narration_id DESC LIMIT 1
+                """,
+                [basket["basket_id"]],
+            ).fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="No narration yet.")
+            return {
+                "narration": row[0],
+                "citations": row[1],
+                "ad_week": row[2].isoformat() if row[2] else None,
+                "model": row[3],
+                "created_at": row[4].isoformat(),
+            }
+        finally:
+            con.close()
+
     @app.get("/api/basket")
     def basket_items() -> dict:
         """The basket's lines with the cheapest gold offer per item (the split)."""
