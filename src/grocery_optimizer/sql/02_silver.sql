@@ -101,6 +101,38 @@ CREATE TABLE IF NOT EXISTS prices (
 ALTER TABLE canonical_products ADD COLUMN IF NOT EXISTS coarse_category VARCHAR;
 ALTER TABLE source_products ADD COLUMN IF NOT EXISTS coarse_category VARCHAR;
 
+-- Verdict cache (v2 step 4, "the library"): every (shopping-list term,
+-- canonical product) adjudication, LLM or human, stored once. Consulted BEFORE
+-- any LLM call, so each ambiguous pair costs one LLM call ever; basket/gold
+-- matching reads ONLY this table, never live LLM output -> deterministic
+-- replay. Compounds into a proprietary regional matching library.
+CREATE SEQUENCE IF NOT EXISTS seq_match_verdict_id START 1;
+CREATE TABLE IF NOT EXISTS match_verdicts (
+    verdict_id           BIGINT PRIMARY KEY DEFAULT nextval('seq_match_verdict_id'),
+    normalized_list_term VARCHAR NOT NULL,   -- silver.normalize.normalize_name
+    canonical_id         BIGINT NOT NULL,
+    verdict              VARCHAR NOT NULL,   -- match|no_match
+    confidence           DOUBLE,             -- 0..1; < threshold -> review queue
+    reason               VARCHAR,
+    model                VARCHAR,            -- adjudicating model, NULL for human
+    decided_by           VARCHAR NOT NULL DEFAULT 'llm',  -- llm|human
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at           TIMESTAMPTZ,
+    UNIQUE (normalized_list_term, canonical_id)
+);
+
+-- Below-confidence verdicts wait here for a human; they are stored in the
+-- cache but ignored by selection until approved (or flipped on rejection).
+CREATE SEQUENCE IF NOT EXISTS seq_match_review_id START 1;
+CREATE TABLE IF NOT EXISTS match_review_queue (
+    review_id   BIGINT PRIMARY KEY DEFAULT nextval('seq_match_review_id'),
+    verdict_id  BIGINT NOT NULL,
+    status      VARCHAR NOT NULL DEFAULT 'open',  -- open|approved|rejected
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved_at TIMESTAMPTZ,
+    resolved_by VARCHAR
+);
+
 -- Human review queue: below-threshold entity matches never flow silently into
 -- gold. The adjudicator agent parks ambiguous matches here.
 CREATE TABLE IF NOT EXISTS resolution_queue (
