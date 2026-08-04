@@ -42,7 +42,15 @@ core") are DONE and stay listed for history; v2 step numbering restarts at 2
 - [ ] **4. LLM adjudicator + DuckDB verdict cache + human-review queue** — TODO
   (distinct from the step-8 entity-resolution adjudicator above; this one is
   category-guard adjudication per CLAUDE.md).
-- [ ] **5. PWA frontend** — TODO.
+- [x] **5. PWA frontend** — FastAPI (`api/app.py`, `grocery-serve`, port 8177)
+  serving gold-only endpoints (`/api/verdict`, `/api/basket`); one-screen
+  mobile PWA (`webapp/`: verdict hero, ranked stores, coverage flags,
+  exact/flexible toggle, split footnote, installable manifest + SW, dark/light).
+  `scripts/seed_demo.py` (`grocery-seed-demo`) seeds a deterministic synthetic
+  demo dataset (4 stores x 26 items) designed so the substitution modes
+  diverge (flexible → Harris Teeter $123.17; exact → Whole Foods, kroger's two
+  0.90-conf store-brand subs drop out) and Aldi is cheap-but-partial. Demo
+  screenshots in `docs/screenshots/`, embedded in README. Tests: `tests/test_api.py`.
 - [ ] **6. Windows Task Scheduler job** — TODO (same as pre-pivot step 7).
 - [ ] **7. Parser self-healing agent + weekly narrator** — TODO.
 - [ ] **8. Showcase phase** — TODO.
@@ -63,7 +71,9 @@ uv run grocery-lidl-probe       # Lidl overview
 uv run grocery-normalize [--rebuild]   # bronze -> silver -> gold + resolve
 uv run grocery-adjudicate [--limit N]  # LLM entity adjudicator (spends API credits)
 uv run grocery-optimize         # synthetic basket -> single-store verdict (split as footnote)
-uv run pytest                   # 71 tests
+uv run grocery-seed-demo        # deterministic synthetic demo dataset (no creds)
+uv run grocery-serve            # FastAPI + verdict PWA on http://localhost:8177
+uv run pytest                   # 77 tests
 ```
 Latest run: no single in-range store covers all 26 items yet (thin cross-store
 recall, see limitation 3 below), so the split ($124.99 across 4 stores) is

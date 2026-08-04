@@ -1,0 +1,12 @@
+{
+  "name": "Grocery Verdict",
+  "short_name": "Verdict",
+  "description": "One store, one total: this week's cheapest grocery run.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F7F8F5",
+  "theme_color": "#237A57",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

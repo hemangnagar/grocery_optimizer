@@ -18,6 +18,8 @@ dependencies = [
     "anthropic>=0.40",
     "beautifulsoup4>=4.12",
     "pytz>=2024.1",
+    "fastapi>=0.111",
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +38,8 @@ grocery-kroger-fetch = "grocery_optimizer.scripts.kroger_fetch:main"
 grocery-tj-fetch = "grocery_optimizer.scripts.tj_fetch:main"
 grocery-optimize = "grocery_optimizer.scripts.optimize_basket:main"
 grocery-adjudicate = "grocery_optimizer.scripts.adjudicate:main"
+grocery-seed-demo = "grocery_optimizer.scripts.seed_demo:main"
+grocery-serve = "grocery_optimizer.api.app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/grocery_optimizer"]

@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B4D38" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#237A57">
+<title>Grocery Verdict</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root {
+    --paper: #F7F8F5;
+    --card: #FFFFFF;
+    --ink: #1E2422;
+    --muted: #66716C;
+    --line: #E1E5DF;
+    --accent: #237A57;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #E4F0EA;
+    --warn: #A8841F;
+    --warn-soft: #F5EDD8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #141816; --card: #1D2320; --ink: #E8ECE9; --muted: #93A09A;
+      --line: #2E3632; --accent: #3FAE81; --accent-ink: #0C1410;
+      --accent-soft: #21352C; --warn: #CFA83E; --warn-soft: #332D1A;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.45;
+    padding: max(14px, env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 2px 2px 0; }
+  .wordmark {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); margin: 0;
+  }
+  .adweek { font-size: 0.74rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .toggle {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px;
+  }
+  .toggle button {
+    appearance: none; border: 0; background: transparent; color: var(--muted);
+    font: inherit; font-size: 0.86rem; font-weight: 600;
+    padding: 9px 6px; border-radius: 9px; cursor: pointer;
+  }
+  .toggle button.active { background: var(--accent); color: var(--accent-ink); }
+  .toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .toggle .sub { display: block; font-size: 0.66rem; font-weight: 500; opacity: 0.75; }
+
+  .hero {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 20px 20px 18px; border-top: 4px solid var(--accent);
+  }
+  .hero .kicker { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0; }
+  .hero h1 { margin: 4px 0 2px; font-size: 1.5rem; line-height: 1.2; }
+  .hero .total { font-size: 2.6rem; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
+  .hero .delta { margin: 4px 0 0; font-size: 0.9rem; color: var(--muted); }
+  .hero .delta b { color: var(--accent); }
+  .chip {
+    display: inline-block; font-size: 0.72rem; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px; vertical-align: 2px;
+  }
+  .chip.full { background: var(--accent-soft); color: var(--accent); }
+  .chip.partial { background: var(--warn-soft); color: var(--warn); }
+
+  .stores { display: flex; flex-direction: column; gap: 8px; }
+  .store {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .store .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .store .name { font-weight: 650; font-size: 0.95rem; }
+  .store .price { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .store .meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 3px; font-size: 0.78rem; color: var(--muted); }
+  .store details { margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
+  .store summary { cursor: pointer; color: var(--warn); font-weight: 600; }
+
+  .footnote {
+    border-left: 3px solid var(--line); padding: 4px 14px; font-size: 0.84rem; color: var(--muted);
+  }
+  .footnote b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .empty { background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 22px 16px; text-align: center; color: var(--muted); font-size: 0.9rem; }
+
+  footer { text-align: center; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.04em; margin-top: 6px; }
+  .badge {
+    display: inline-block; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--warn); border: 1px solid var(--warn);
+    border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .hero, .store { transition: border-color 0.15s ease; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="wordmark">Grocery Verdict</p>
+    <span class="adweek" id="adweek"></span>
+  </header>
+
+  <div class="toggle" role="tablist" aria-label="Substitution mode">
+    <button id="btn-flexible" class="active" role="tab" aria-selected="true">
+      Flexible<span class="sub">store brands OK</span>
+    </button>
+    <button id="btn-exact" role="tab" aria-selected="false">
+      Exact brands<span class="sub">no substitutes</span>
+    </button>
+  </div>
+
+  <div id="content"><div class="empty">Loading this week's verdict…</div></div>
+
+  <footer>
+    Every number queried from the gold layer — nothing computed in the browser.
+    <span class="badge" id="synthetic-badge" hidden>Synthetic data</span>
+  </footer>
+</main>
+
+<script>
+  const fmt = (n) => "$" + Number(n).toFixed(2);
+  let data = null;
+  let mode = "flexible";
+
+  function bannerOf(source) {
+    return (data.banners && data.banners[source]) || source;
+  }
+
+  function storeCard(s, winnerTotal) {
+    const missing = s.missing_labels || [];
+    const coverage = s.full_coverage
+      ? '<span class="chip full">covers ' + s.items_covered + "/" + s.n_items + "</span>"
+      : '<span class="chip partial">missing ' + missing.length + " of " + s.n_items + "</span>";
+    const delta = winnerTotal != null && s.store_total > winnerTotal
+      ? "+" + fmt(s.store_total - winnerTotal) + " vs winner"
+      : "";
+    const details = missing.length
+      ? "<details><summary>missing items</summary>" + missing.join(", ") + "</details>"
+      : "";
+    return (
+      '<div class="store"><div class="row"><span class="name">' + bannerOf(s.source) +
+      '</span><span class="price">' + fmt(s.store_total) + "</span></div>" +
+      '<div class="meta"><span>' + coverage + "</span><span>" + delta + "</span></div>" +
+      details + "</div>"
+    );
+  }
+
+  function render() {
+    const el = document.getElementById("content");
+    const m = data[mode];
+    const stores = m.stores || [];
+    const winner = m.winner;
+    let html = "";
+
+    if (winner) {
+      const others = stores.filter((s) => s.source !== winner.source);
+      const runnerUp = others.find((s) => s.full_coverage);
+      const deltaLine = runnerUp
+        ? bannerOf(runnerUp.source) + " would've been " + fmt(runnerUp.store_total) +
+          " — you save <b>" + fmt(runnerUp.store_total - winner.store_total) + "</b>"
+        : "No other store covers the whole list this week.";
+      html +=
+        '<div class="hero"><p class="kicker">This week, shop at</p>' +
+        "<h1>" + bannerOf(winner.source) + "</h1>" +
+        '<div class="total">' + fmt(winner.store_total) + "</div>" +
+        '<span class="chip full">covers all ' + winner.n_items + " items</span>" +
+        '<p class="delta">' + deltaLine + "</p></div>";
+      html += '<div class="stores">' + others.map((s) => storeCard(s, winner.store_total)).join("") + "</div>";
+    } else if (stores.length) {
+      html +=
+        '<div class="hero"><p class="kicker">No clean winner</p>' +
+        "<h1>No single store covers your list</h1>" +
+        '<p class="delta">Closest options below — totals only cover the items each store carries.</p></div>';
+      html += '<div class="stores">' + stores.map((s) => storeCard(s, null)).join("") + "</div>";
+    } else {
+      html += '<div class="empty">No prices for this basket in the current week.</div>';
+    }
+
+    const fn = data.split_footnote;
+    if (fn && fn.savings != null) {
+      const verdictTxt = fn.worth_it ? "might be worth the drive." : "probably not worth it.";
+      html +=
+        '<p class="footnote">A perfect ' + fn.stores_used.length + "-store split would be <b>" +
+        fmt(fn.split_total) + "</b> — another <b>" + fmt(fn.savings) + "</b> saved, " + verdictTxt + "</p>";
+    } else if (fn) {
+      html +=
+        '<p class="footnote">Splitting across ' + fn.stores_used.length + " stores covers everything for <b>" +
+        fmt(fn.split_total) + "</b>.</p>";
+    }
+    el.innerHTML = html;
+  }
+
+  function setMode(next) {
+    mode = next;
+    document.getElementById("btn-flexible").classList.toggle("active", next === "flexible");
+    document.getElementById("btn-exact").classList.toggle("active", next === "exact");
+    document.getElementById("btn-flexible").setAttribute("aria-selected", next === "flexible");
+    document.getElementById("btn-exact").setAttribute("aria-selected", next === "exact");
+    if (data) render();
+  }
+  document.getElementById("btn-flexible").addEventListener("click", () => setMode("flexible"));
+  document.getElementById("btn-exact").addEventListener("click", () => setMode("exact"));
+
+  fetch("api/verdict")
+    .then((r) => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then((d) => {
+      data = d;
+      if (d.ad_week) document.getElementById("adweek").textContent = "ad week of " + d.ad_week;
+      if (d.basket && d.basket.is_synthetic) document.getElementById("synthetic-badge").hidden = false;
+      render();
+    })
+    .catch(() => {
+      document.getElementById("content").innerHTML =
+        '<div class="empty">Couldn’t reach the optimizer. Is the server running?<br>' +
+        "Seed data with <code>grocery-seed-demo</code>, serve with <code>grocery-serve</code>.</div>";
+    });
+
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
