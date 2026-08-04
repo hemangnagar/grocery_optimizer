@@ -14,6 +14,7 @@ SELECT
     cp.canonical_id,
     cp.name              AS canonical_name,
     cp.category,
+    cp.coarse_category,
     cp.canonical_unit,
     p.source,
     p.store_id,

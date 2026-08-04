@@ -15,6 +15,7 @@ import duckdb
 
 from .. import config
 from .kcl import parse_deals
+from .taxonomy import coarse_category
 from .units import unit_price
 
 # Per-source price confidence (feeds the gold >=0.85 trust gate).
@@ -204,6 +205,7 @@ def parse_tj_products(raw: bytes) -> list[dict]:
 
 
 def _upsert_source_product(con, rec: dict, fetched_at, manifest_id: int) -> int:
+    coarse = coarse_category(rec["category_hint"], rec["raw_name"])
     existing = None
     if rec["source_sku"]:
         existing = con.execute(
@@ -216,24 +218,26 @@ def _upsert_source_product(con, rec: dict, fetched_at, manifest_id: int) -> int:
             """
             UPDATE source_products
             SET last_seen_at = ?, raw_name = ?, raw_size_text = ?,
-                category_hint = COALESCE(category_hint, ?)
+                category_hint = COALESCE(category_hint, ?),
+                coarse_category = COALESCE(coarse_category, ?)
             WHERE source_product_id = ?
             """,
-            [fetched_at, rec["raw_name"], rec["raw_size_text"], rec["category_hint"], spid],
+            [fetched_at, rec["raw_name"], rec["raw_size_text"], rec["category_hint"], coarse, spid],
         )
         return spid
     return con.execute(
         """
         INSERT INTO source_products (
             source, source_sku, raw_name, raw_brand, raw_size_text,
-            category_hint, first_seen_at, last_seen_at, bronze_manifest_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            category_hint, coarse_category, first_seen_at, last_seen_at,
+            bronze_manifest_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING source_product_id
         """,
         [
             rec["source"], rec["source_sku"], rec["raw_name"], rec["raw_brand"],
-            rec["raw_size_text"], rec["category_hint"], fetched_at, fetched_at,
-            manifest_id,
+            rec["raw_size_text"], rec["category_hint"], coarse, fetched_at,
+            fetched_at, manifest_id,
         ],
     ).fetchone()[0]
 

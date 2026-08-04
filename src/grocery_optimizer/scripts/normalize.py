@@ -13,6 +13,7 @@ import sys
 from ..db import get_connection, init_db
 from ..silver.normalize import ingest_bronze
 from ..silver.resolve import reset_resolution, resolve_products
+from ..silver.taxonomy import backfill_coarse_categories, enforce_category_guard
 
 
 def main() -> None:
@@ -36,6 +37,19 @@ def main() -> None:
             f"Ingested {ing['manifests']} bronze artifact(s) -> "
             f"{ing['prices']} price rows; {ing['source_products']} source products total."
         )
+
+        # Category guard (v2 step 3): classify rows that predate the taxonomy,
+        # then sever any existing fuzzy links that cross coarse categories so
+        # they re-resolve within their own category below.
+        back = backfill_coarse_categories(con)
+        if back["source_products"] or back["canonical_products"]:
+            print(
+                f"Taxonomy backfill: {back['source_products']} source products, "
+                f"{back['canonical_products']} canonicals classified."
+            )
+        severed = enforce_category_guard(con)
+        if severed:
+            print(f"Category guard: unlinked {severed} cross-category fuzzy match(es).")
 
         res = resolve_products(con)
         print(

@@ -16,6 +16,11 @@ NOT merging (a separate canonical or the review queue) over a wrong merge.
 
 The below-AUTO band is where the LLM adjudicator agent will plug in later; for
 now those rows wait in the human-review queue.
+
+Category guard (v2 step 3): matches may NEVER cross coarse categories
+(silver.taxonomy). Candidates in a different known coarse category are hard-
+skipped before any fuzzy scoring — no score, however high, can cross the line
+("chicken" never matches "chicken crackers"). Unknown (NULL) never blocks.
 """
 
 from __future__ import annotations
@@ -38,14 +43,16 @@ def _display_name(raw: str | None) -> str:
     return _TRADEMARK.sub("", raw or "").strip()
 
 
-def _create_canonical(con, raw_name: str, category: str | None) -> int:
+def _create_canonical(
+    con, raw_name: str, category: str | None, coarse: str | None
+) -> int:
     return con.execute(
         """
-        INSERT INTO canonical_products (name, category)
-        VALUES (?, ?)
+        INSERT INTO canonical_products (name, category, coarse_category)
+        VALUES (?, ?, ?)
         RETURNING canonical_id
         """,
-        [_display_name(raw_name), category],
+        [_display_name(raw_name), category, coarse],
     ).fetchone()[0]
 
 
@@ -96,7 +103,7 @@ def resolve_products(
     now = datetime.now(timezone.utc)
     unresolved = con.execute(
         """
-        SELECT source_product_id, raw_name, category_hint
+        SELECT source_product_id, raw_name, category_hint, coarse_category
         FROM source_products
         WHERE canonical_id IS NULL
         ORDER BY source_product_id
@@ -104,19 +111,21 @@ def resolve_products(
     ).fetchall()
 
     stats = {"linked": 0, "queued": 0, "created": 0}
-    for spid, raw_name, category in unresolved:
+    for spid, raw_name, category, coarse in unresolved:
         norm = normalize_name(raw_name)
         if not norm:
             continue
 
         # Candidate canonicals (recomputed each iteration so items created
-        # earlier in this pass are matchable). Filter by category when known.
+        # earlier in this pass are matchable). HARD category guard: a candidate
+        # in a different known coarse category is never scored, so no fuzzy
+        # score can cross categories. Unknown (NULL) on either side is lenient.
         candidates = con.execute(
-            "SELECT canonical_id, name, category FROM canonical_products"
+            "SELECT canonical_id, name, coarse_category FROM canonical_products"
         ).fetchall()
         best_id, best_name, best_score = None, None, -1
-        for cid, cname, ccat in candidates:
-            if category and ccat and category.lower() != ccat.lower():
+        for cid, cname, ccoarse in candidates:
+            if coarse and ccoarse and coarse != ccoarse:
                 continue
             score = fuzz.token_sort_ratio(norm, normalize_name(cname))
             if score > best_score:
@@ -133,7 +142,7 @@ def resolve_products(
             stats["queued"] += 1
         else:
             method = "seed" if not candidates else "new"
-            cid = _create_canonical(con, raw_name, category)
+            cid = _create_canonical(con, raw_name, category, coarse)
             _link(con, spid, cid, 1.0, method, now)
             stats["created"] += 1
     return stats

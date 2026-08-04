@@ -128,6 +128,10 @@ def _open_queue(con) -> list[dict]:
         JOIN source_products sp ON sp.source_product_id = rq.source_product_id
         JOIN canonical_products cp ON cp.canonical_id = rq.candidate_canonical_id
         WHERE rq.status = 'open'
+          -- hard category guard: cross-category pairs are wrong by definition,
+          -- never worth an LLM call (pairs queued before the taxonomy existed)
+          AND (sp.coarse_category IS NULL OR cp.coarse_category IS NULL
+               OR sp.coarse_category = cp.coarse_category)
         ORDER BY adds_source DESC, rq.proposed_confidence DESC, rq.queue_id
         """
     ).fetchall()
