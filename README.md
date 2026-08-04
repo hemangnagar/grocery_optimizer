@@ -56,19 +56,19 @@ flowchart LR
     L --> R
     R --> N --> X --> E
     E -->|trusted links, conf >= 0.85| G
-    G -.->|planned| F[FastAPI -> PWA]
+    G -->|gold queries only| F[FastAPI -> PWA]
 
     subgraph AI [AI surface - proposes, never writes to gold]
         Q[resolution_queue] --> C[verdict cache] --> J[LLM adjudicator]
         J -->|below threshold| H[human review queue]
         P[parser self-healing agent*]
-        NR[weekly narrator*]
+        NR[weekly narrator + audit gate]
     end
     E -->|ambiguous ~20%| Q
     J -->|verdict applied by the pipeline| E
     R -.->|schema drift| P
     P -.->|patch validated on bronze replay| N
-    G -.->|reads gold only, cites row IDs| NR
+    G -->|reads gold only, cites row IDs| NR
 ```
 
 \* planned — see the build order in `CLAUDE.md`.

@@ -40,6 +40,7 @@ grocery-optimize = "grocery_optimizer.scripts.optimize_basket:main"
 grocery-adjudicate = "grocery_optimizer.scripts.adjudicate:main"
 grocery-seed-demo = "grocery_optimizer.scripts.seed_demo:main"
 grocery-adjudicate-list = "grocery_optimizer.scripts.adjudicate_list:main"
+grocery-narrate = "grocery_optimizer.scripts.narrate:main"
 grocery-serve = "grocery_optimizer.api.app:main"
 
 [tool.hatch.build.targets.wheel]

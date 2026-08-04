@@ -94,6 +94,13 @@
   }
   .footnote b { color: var(--ink); font-variant-numeric: tabular-nums; }
 
+  .narrative {
+    background: var(--accent-soft); border-radius: 12px; padding: 14px 16px;
+    font-size: 0.88rem; display: none;
+  }
+  .narrative p { margin: 0; }
+  .narrative .cite { margin-top: 8px; font-size: 0.66rem; color: var(--muted); overflow-wrap: anywhere; }
+
   .empty { background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 22px 16px; text-align: center; color: var(--muted); font-size: 0.9rem; }
 
   footer { text-align: center; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.04em; margin-top: 6px; }
@@ -124,6 +131,11 @@
   </div>
 
   <div id="content"><div class="empty">Loading this week's verdict…</div></div>
+
+  <div class="narrative" id="narrative">
+    <p id="narrative-text"></p>
+    <p class="cite" id="narrative-cite"></p>
+  </div>
 
   <footer>
     Every number queried from the gold layer — nothing computed in the browser.
@@ -231,6 +243,18 @@
         '<div class="empty">Couldn’t reach the optimizer. Is the server running?<br>' +
         "Seed data with <code>grocery-seed-demo</code>, serve with <code>grocery-serve</code>.</div>";
     });
+
+  // Stored, audited narration (written weekly by grocery-narrate; this fetch
+  // never triggers an LLM call — absent narration is simply not shown).
+  fetch("api/narrative")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((n) => {
+      if (!n) return;
+      document.getElementById("narrative-text").textContent = n.narration;
+      document.getElementById("narrative-cite").textContent = "Sources: " + n.citations;
+      document.getElementById("narrative").style.display = "block";
+    })
+    .catch(() => {});
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 </script>

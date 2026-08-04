@@ -52,6 +52,24 @@ QUALIFY row_number() OVER (
     ORDER BY price ASC NULLS LAST, source ASC
 ) = 1;
 
+-- Weekly narrations (agentic layer #3): LLM-written prose over a deterministic
+-- fact pack, stored only after the audit gate verifies every number appears in
+-- gold. The API serves ONLY stored rows (narrate once, serve cached — zero
+-- tokens per view, deterministic replay), with citations appended by the
+-- pipeline, never by the model.
+CREATE SEQUENCE IF NOT EXISTS seq_narration_id START 1;
+CREATE TABLE IF NOT EXISTS narrations (
+    narration_id BIGINT PRIMARY KEY DEFAULT nextval('seq_narration_id'),
+    basket_id    BIGINT NOT NULL,
+    ad_week      DATE,
+    narration    VARCHAR NOT NULL,
+    citations    VARCHAR,              -- gold row IDs, appended deterministically
+    facts        VARCHAR,              -- the JSON fact pack the model saw
+    model        VARCHAR,
+    audit_ok     BOOLEAN NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Single-store option: for each source, how many basket items it carries and the
 -- total to buy those items there (cheapest offer per item within that source).
 CREATE OR REPLACE VIEW gold_basket_store_totals AS

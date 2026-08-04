@@ -163,7 +163,7 @@
   <figure>
     <div class="diagram-scroll">
     <svg viewBox="0 0 1140 664" role="img"
-         aria-label="Data flows left to right from five retail sources into bronze raw storage, silver normalization and entity resolution in DuckDB, then gold query views serving a verdict engine and planned PWA. Below a separator line, the AI surface: ambiguous matches queue to an LLM adjudicator behind a planned verdict cache, returning verdicts the deterministic pipeline applies; planned parser self-healing and narrator agents sit at the edges."
+         aria-label="Data flows left to right from five retail sources into bronze raw storage, silver normalization and entity resolution in DuckDB, then gold query views serving a verdict engine, FastAPI, and the PWA. Below a separator line, the AI surface: ambiguous matches queue to an LLM adjudicator behind a verdict cache, returning verdicts the deterministic pipeline applies; an audited weekly narrator reads gold, and a planned parser self-healing agent watches bronze."
          font-family="ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace" fill="none">
       <defs>
         <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -274,7 +274,7 @@
       <text x="868" y="324" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6" font-style="italic">bronze via row IDs</text>
 
       <!-- ======== serving (planned) ======== -->
-      <g stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4">
+      <g stroke="currentColor" stroke-width="1.2">
         <rect x="1008" y="140" width="112" height="40" rx="6"/>
         <rect x="1008" y="216" width="112" height="40" rx="6"/>
       </g>
@@ -335,7 +335,7 @@
       <text x="326" y="416" font-size="9.5" style="fill: var(--ai)">validated patch</text>
 
       <!-- weekly narrator (planned) -->
-      <rect x="1008" y="470" width="112" height="66" rx="6" style="stroke: var(--ai)" stroke-width="1.4" stroke-dasharray="5 4" fill="var(--ai-soft)"/>
+      <rect x="1008" y="470" width="112" height="66" rx="6" style="stroke: var(--ai)" stroke-width="1.6" fill="var(--ai-soft)"/>
       <text x="1064" y="492" text-anchor="middle" font-size="11" fill="currentColor" font-weight="bold">weekly narrator</text>
       <text x="1064" y="507" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">reads gold only,</text>
       <text x="1064" y="520" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">cites row IDs</text>
@@ -392,11 +392,13 @@
         if output matches — a deterministic validation gate on generated code.</p>
       </div>
       <div class="card">
-        <span class="status planned">Planned</span>
+        <span class="status built">Built · shipping</span>
         <h3>Weekly plan narrator</h3>
-        <p>Turns the gold verdict into prose — "Giant wins this week at $91.40." Reads gold views only and
-        <b>cites row IDs for every number</b>, so the narration is an auditable rendering of query results,
-        not generation.</p>
+        <p>Writes one paragraph from a deterministic gold fact pack (every total and delta precomputed).
+        A <b>hard audit gate</b> extracts every number from the prose and rejects the narration if any
+        number is missing from the fact pack — nothing unaudited is stored or served. Citations
+        (gold price row IDs) are appended by the pipeline, never emitted by the model; the PWA serves
+        stored narrations at zero tokens per view.</p>
       </div>
     </div>
   </section>
@@ -425,10 +427,11 @@
         </tr>
         <tr>
           <td class="claim">Agentic systems</td>
-          <td><span class="partial">Partial</span></td>
-          <td class="how">One agent live (adjudicator), two designed with validation gates (self-healing parser,
-          narrator). Say "agentic components with deterministic gates" — the gating story is more senior than
-          "I built agents." Build the self-healing parser next if you want this to read as a firm yes.</td>
+          <td><span class="yes">Yes</span></td>
+          <td class="how">Three agents live behind deterministic gates: the entity adjudicator (confidence
+          thresholds + human fallback), the list-term adjudicator with its verdict cache, and the narrator
+          with a <b>number-audit gate</b> that rejects any prose gold can't vouch for. One designed agent
+          remains (self-healing parser). "Agents behind gates" is the senior version of this story.</td>
         </tr>
         <tr>
           <td class="claim">RAG</td>
