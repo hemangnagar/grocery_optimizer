@@ -73,6 +73,23 @@ flowchart LR
 
 \* planned — see the build order in `CLAUDE.md`.
 
+## The verdict PWA
+
+One screen, one answer: which single store wins your whole list this week.
+Mobile-first, installable to a phone home screen, served on the local network
+from FastAPI — the frontend renders gold-layer query results and never computes
+a price itself. The exact-brands / flexible toggle is driven by entity-match
+confidence scores, so the two modes can genuinely disagree (below: flexible
+picks Harris Teeter at $123.17; exact brands drops its two store-brand
+substitutes and Whole Foods becomes the only full-coverage store).
+
+| Flexible (store brands OK) | Exact brands | Dark theme |
+| :---: | :---: | :---: |
+| ![Flexible mode verdict](docs/screenshots/verdict-flexible-light.png) | ![Exact brands verdict](docs/screenshots/verdict-exact-light.png) | ![Dark theme verdict](docs/screenshots/verdict-flexible-dark.png) |
+
+All numbers shown are from the seeded synthetic demo dataset
+(`grocery-seed-demo`) — realistic invented prices, no harvested data.
+
 ## Quickstart
 
 ```powershell
@@ -84,6 +101,10 @@ uv run grocery-init-db
 
 # Run tests
 uv run pytest
+
+# Try the whole thing with synthetic data (no credentials needed)
+uv run grocery-seed-demo   # seed 4 stores x 26 items of demo prices
+uv run grocery-serve       # verdict PWA at http://localhost:8177
 ```
 
 Then copy `.env.example` to `.env` and fill in credentials as you build out the
