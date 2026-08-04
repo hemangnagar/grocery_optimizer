@@ -114,8 +114,22 @@ modes already diverge on real data (e.g. kroger covers 14/26 in exact mode vs
 - `git` is not on PATH — PortableGit at `%LOCALAPPDATA%\Programs\PortableGit\cmd`; prepend it per command. Branch `main`; remote `origin` set (GitHub), nothing pushed. `data/` is gitignored (the moat).
 
 ## Suggested next steps
-Run `uv run grocery-normalize` on the real DB (backfills taxonomy + severs any
-cross-category links) → drain the resolution_queue via `grocery-adjudicate` to
-grow cross-store recall so the verdict actually has a winner on real data →
-v2 step 4 (LLM category adjudicator + verdict cache) → plan narrator → size
-normalization fix → v2 step 6 (Task Scheduler).
+_(updated 2026-08-04 — steps 3/4/5 + narrator shipped this session)_
+
+On the home box (needs .env / Windows):
+- `git pull origin main && uv sync`, then `uv run grocery-normalize` on the
+  real DB (backfills taxonomy + severs cross-category links) → drain
+  `resolution_queue` via `grocery-adjudicate` (Haiku for cost) to grow
+  cross-store recall → `grocery-adjudicate-list` to warm the verdict cache →
+  `grocery-narrate` for the first real audited narration → re-screenshot the
+  PWA showing verdict + narrative.
+- v2 step 6: Windows Task Scheduler Tuesday-night pull.
+
+Remote-session friendly (no creds needed):
+- **Geolocation + store coverage** (agreed next feature): populate `stores`
+  lat/lon via chain locator APIs (Kroger Locations API is official), static
+  zip→centroid geocode for HOME_ZIP, haversine radius filter in gold, PWA
+  distance chips, demo-seed lat/lons. Groundwork exists: `config.HOME_ZIP`,
+  `SEARCH_RADIUS_MILES`, empty `stores.lat/lon/zip` columns.
+- Parser self-healing agent (last dashed box on the diagram) → size
+  normalization fix (limitation 2) → step 8 showcase polish.
