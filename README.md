@@ -90,6 +90,13 @@ substitutes and Whole Foods becomes the only full-coverage store).
 All numbers shown are from the seeded synthetic demo dataset
 (`grocery-seed-demo`) — realistic invented prices, no harvested data.
 
+> **A note on data.** This repo is the machinery, not the moat. The demo
+> dataset is synthetic; the production system runs against a growing private
+> archive of DC-metro weekly price history (weekly ads expire and are
+> unrecoverable — the bronze layer is a time machine) and an adjudicated
+> product-matching verdict library that compounds with every run. Neither
+> ships here. If that part interests you, ask me about it.
+
 ## Quickstart
 
 ```powershell
