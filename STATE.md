@@ -1,6 +1,6 @@
 # Project State — grocery-optimizer
 
-_Working handoff doc. Last updated 2026-07-22._
+_Working handoff doc. Last updated 2026-08-04._
 
 ## Build-order status (see CLAUDE.md for the plan)
 
@@ -26,7 +26,19 @@ core") are DONE and stay listed for history; v2 step numbering restarts at 2
   flexible (>= 0.85) substitution modes, split-savings footnote with a
   deterministic "probably not worth it" heuristic. `grocery-optimize` now
   prints the verdict first, split detail as a footnote. Tests: `tests/test_verdict.py`.
-- [ ] **3. Category taxonomy at silver + hard cross-category match block** — TODO.
+- [x] **3. Category taxonomy at silver + hard cross-category match block** —
+  `silver/taxonomy.py`: deterministic coarse categories
+  (produce/protein/dairy/snack/pantry/frozen/household) assigned at ingest from
+  source hint first, then ordered name rules where FORM beats INGREDIENT
+  ("chicken crackers"→snack, "chicken broth"→pantry). Hard guard everywhere:
+  resolve.py never scores cross-category candidates, basket matching filters by
+  the list item's coarse category, the adjudicator queue skips cross-category
+  pairs (zero tokens), and `grocery-normalize` backfills pre-taxonomy rows +
+  severs existing cross-category rapidfuzz links for re-resolution
+  (`enforce_category_guard`; llm/manual links are spared). NULL category never
+  blocks (recall over precision). `coarse_category` added to source_products,
+  canonical_products, gold_current_prices (ALTER IF NOT EXISTS migration in
+  02_silver.sql). Tests: `tests/test_taxonomy.py`.
 - [ ] **4. LLM adjudicator + DuckDB verdict cache + human-review queue** — TODO
   (distinct from the step-8 entity-resolution adjudicator above; this one is
   category-guard adjudication per CLAUDE.md).
@@ -51,7 +63,7 @@ uv run grocery-lidl-probe       # Lidl overview
 uv run grocery-normalize [--rebuild]   # bronze -> silver -> gold + resolve
 uv run grocery-adjudicate [--limit N]  # LLM entity adjudicator (spends API credits)
 uv run grocery-optimize         # synthetic basket -> single-store verdict (split as footnote)
-uv run pytest                   # 37 tests
+uv run pytest                   # 71 tests
 ```
 Latest run: no single in-range store covers all 26 items yet (thin cross-store
 recall, see limitation 3 below), so the split ($124.99 across 4 stores) is
@@ -71,7 +83,8 @@ modes already diverge on real data (e.g. kroger covers 14/26 in exact mode vs
 - `git` is not on PATH — PortableGit at `%LOCALAPPDATA%\Programs\PortableGit\cmd`; prepend it per command. Branch `main`; remote `origin` set (GitHub), nothing pushed. `data/` is gitignored (the moat).
 
 ## Suggested next steps
-v2 step 3 (category taxonomy + hard cross-category match block) → drain the
-resolution_queue via `grocery-adjudicate` to grow cross-store recall so the
-verdict actually has a winner on real data → plan narrator → size
+Run `uv run grocery-normalize` on the real DB (backfills taxonomy + severs any
+cross-category links) → drain the resolution_queue via `grocery-adjudicate` to
+grow cross-store recall so the verdict actually has a winner on real data →
+v2 step 4 (LLM category adjudicator + verdict cache) → plan narrator → size
 normalization fix → v2 step 6 (Task Scheduler).

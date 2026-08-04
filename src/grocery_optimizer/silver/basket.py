@@ -41,6 +41,18 @@ SHOPPING_LIST = [
 ]
 
 
+# Shopping-list category -> coarse taxonomy category (silver.taxonomy). The
+# hard guard: a list item may only match products in its own coarse category
+# ("chicken" can never pick "chicken crackers" — that's a snack).
+_LIST_TO_COARSE = {
+    "produce": "produce",
+    "dairy": "dairy",
+    "protein": "protein",
+    "staples": "pantry",
+    "snacks": "snack",
+}
+
+
 # Product types that are lexical false-friends of staples (e.g. "Rice Pudding"
 # for rice, "Marshmallow Eggs" for eggs). Deterministic guard; precise semantic
 # item selection is the job of the step-8 LLM narrator/adjudicator.
@@ -50,11 +62,14 @@ _FALSE_FRIENDS = (
 )
 
 
-def _match_canonical(con, keyword: str, exclude: set[int]) -> tuple[int, str] | None:
+def _match_canonical(
+    con, keyword: str, exclude: set[int], coarse: str | None = None
+) -> tuple[int, str] | None:
     """Best gold canonical for a keyword. Uses whole-word matching (so "apple"
     does not match "Pineapple"), prefers names that START with the term, then
     multi-source, then a short (generic) name, then cheapest. Blocks obvious
-    false-friend product types."""
+    false-friend product types, and (hard rule) never crosses coarse
+    categories when both the list item's and the product's category are known."""
     kw = keyword.lower()
     word_re = r"\b" + kw.replace(" ", r"\s+") + r"s?\b"  # whole word, allow plural
     starts_re = "^" + kw
@@ -66,10 +81,11 @@ def _match_canonical(con, keyword: str, exclude: set[int]) -> tuple[int, str] | 
         FROM gold_current_prices
         WHERE regexp_matches(lower(canonical_name), ?)
           AND NOT regexp_matches(lower(canonical_name), ?)
+          AND (? IS NULL OR coarse_category IS NULL OR coarse_category = ?)
         GROUP BY canonical_id, canonical_name
         ORDER BY starts DESC, ns DESC, length(canonical_name) ASC, mp ASC
         """,
-        [starts_re, word_re, _FALSE_FRIENDS],
+        [starts_re, word_re, _FALSE_FRIENDS, coarse, coarse],
     ).fetchall()
     for canonical_id, name, _ns, _mp, _starts in rows:
         if canonical_id not in exclude:
@@ -99,7 +115,7 @@ def generate_synthetic_basket(
     chosen: set[int] = set()
     matched, missing = [], []
     for category, label, keyword, qty in SHOPPING_LIST:
-        hit = _match_canonical(con, keyword, chosen)
+        hit = _match_canonical(con, keyword, chosen, _LIST_TO_COARSE.get(category))
         if hit is None:
             missing.append(label)
             continue

@@ -45,9 +45,10 @@ CREATE TABLE IF NOT EXISTS stores (
 
 -- Canonical products: the normalized identity every price resolves to.
 CREATE TABLE IF NOT EXISTS canonical_products (
-    canonical_id   BIGINT PRIMARY KEY DEFAULT nextval('seq_canonical_id'),
-    name           VARCHAR NOT NULL,
-    category       VARCHAR,               -- produce|protein|dairy|snacks|staples|...
+    canonical_id    BIGINT PRIMARY KEY DEFAULT nextval('seq_canonical_id'),
+    name            VARCHAR NOT NULL,
+    category        VARCHAR,              -- raw source category hint, free-form
+    coarse_category VARCHAR,              -- produce|protein|dairy|snack|pantry|frozen|household (silver.taxonomy)
     brand          VARCHAR,               -- nullable (produce is brand-agnostic)
     canonical_unit VARCHAR,               -- lb|oz|fl_oz|count|each
     size_value     DOUBLE,                -- packaged size in canonical_unit
@@ -64,6 +65,7 @@ CREATE TABLE IF NOT EXISTS source_products (
     raw_brand          VARCHAR,
     raw_size_text      VARCHAR,           -- e.g. "16 oz", "per lb"
     category_hint      VARCHAR,
+    coarse_category    VARCHAR,           -- assigned at ingest (silver.taxonomy); hard match guard
     canonical_id       BIGINT,            -- nullable until resolved
     match_confidence   DOUBLE,            -- 0..1
     match_method       VARCHAR,           -- exact|rapidfuzz|llm_adjudicator|manual
@@ -94,6 +96,10 @@ CREATE TABLE IF NOT EXISTS prices (
     bronze_manifest_id BIGINT,
     confidence         DOUBLE             -- per-source confidence for this price
 );
+
+-- Migration for databases created before the coarse taxonomy (v2 step 3).
+ALTER TABLE canonical_products ADD COLUMN IF NOT EXISTS coarse_category VARCHAR;
+ALTER TABLE source_products ADD COLUMN IF NOT EXISTS coarse_category VARCHAR;
 
 -- Human review queue: below-threshold entity matches never flow silently into
 -- gold. The adjudicator agent parks ambiguous matches here.
