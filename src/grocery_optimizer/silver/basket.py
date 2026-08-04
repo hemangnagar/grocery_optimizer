@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import duckdb
 
+from .verdict_cache import CONFIDENT, confident_matches, normalize_term
+
 # (category, label, match keyword, weekly quantity) for a family of four.
 SHOPPING_LIST = [
     ("produce", "bananas", "banana", 2),
@@ -62,34 +64,63 @@ _FALSE_FRIENDS = (
 )
 
 
-def _match_canonical(
-    con, keyword: str, exclude: set[int], coarse: str | None = None
-) -> tuple[int, str] | None:
-    """Best gold canonical for a keyword. Uses whole-word matching (so "apple"
-    does not match "Pineapple"), prefers names that START with the term, then
-    multi-source, then a short (generic) name, then cheapest. Blocks obvious
-    false-friend product types, and (hard rule) never crosses coarse
-    categories when both the list item's and the product's category are known."""
+def candidates_for_term(
+    con,
+    keyword: str,
+    coarse: str | None = None,
+    *,
+    limit: int | None = None,
+    exclude_no_match: bool = True,
+) -> list[dict]:
+    """Deterministic gold candidates for a list keyword. Whole-word matching
+    (so "apple" does not match "Pineapple"), ranked: names that START with the
+    term, then multi-source, then a short (generic) name, then cheapest.
+    Blocks false-friend product types and (hard rule) never crosses coarse
+    categories. With ``exclude_no_match`` (selection path), canonicals the
+    verdict cache confidently rejected are filtered out; the adjudication path
+    passes False so the cached candidate set stays stable across runs."""
     kw = keyword.lower()
-    word_re = r"\b" + kw.replace(" ", r"\s+") + r"s?\b"  # whole word, allow plural
+    norm = normalize_term(keyword)
+    word_re = r"\b" + kw.replace(" ", r"\s+") + r"(?:s|es)?\b"  # whole word, allow plural(es)
     starts_re = "^" + kw
     rows = con.execute(
-        """
-        SELECT canonical_id, canonical_name,
+        f"""
+        SELECT canonical_id, canonical_name, any_value(coarse_category),
                count(DISTINCT source) AS ns, min(price) AS mp,
                CASE WHEN regexp_matches(lower(canonical_name), ?) THEN 1 ELSE 0 END AS starts
         FROM gold_current_prices
         WHERE regexp_matches(lower(canonical_name), ?)
           AND NOT regexp_matches(lower(canonical_name), ?)
           AND (? IS NULL OR coarse_category IS NULL OR coarse_category = ?)
+          AND (NOT ? OR canonical_id NOT IN (
+                SELECT canonical_id FROM match_verdicts
+                WHERE normalized_list_term = ? AND verdict = 'no_match'
+                  AND confidence >= {CONFIDENT}
+          ))
         GROUP BY canonical_id, canonical_name
         ORDER BY starts DESC, ns DESC, length(canonical_name) ASC, mp ASC
+        {"LIMIT " + str(int(limit)) if limit else ""}
         """,
-        [starts_re, word_re, _FALSE_FRIENDS, coarse, coarse],
+        [starts_re, word_re, _FALSE_FRIENDS, coarse, coarse, exclude_no_match, norm],
     ).fetchall()
-    for canonical_id, name, _ns, _mp, _starts in rows:
+    return [
+        {"canonical_id": cid, "name": name, "coarse_category": ccat}
+        for cid, name, ccat, _ns, _mp, _starts in rows
+    ]
+
+
+def _match_canonical(
+    con, keyword: str, exclude: set[int], coarse: str | None = None
+) -> tuple[int, str] | None:
+    """Best gold canonical for a keyword: cached confident verdicts first (the
+    library — deterministic, LLM-sourced but never live), then the keyword
+    heuristic minus cache-rejected candidates."""
+    for canonical_id, name in confident_matches(con, normalize_term(keyword), coarse):
         if canonical_id not in exclude:
             return canonical_id, name
+    for cand in candidates_for_term(con, keyword, coarse):
+        if cand["canonical_id"] not in exclude:
+            return cand["canonical_id"], cand["name"]
     return None
 
 

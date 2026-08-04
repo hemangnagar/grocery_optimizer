@@ -59,7 +59,7 @@ flowchart LR
     G -.->|planned| F[FastAPI -> PWA]
 
     subgraph AI [AI surface - proposes, never writes to gold]
-        Q[resolution_queue] --> C[verdict cache*] --> J[LLM adjudicator]
+        Q[resolution_queue] --> C[verdict cache] --> J[LLM adjudicator]
         J -->|below threshold| H[human review queue]
         P[parser self-healing agent*]
         NR[weekly narrator*]

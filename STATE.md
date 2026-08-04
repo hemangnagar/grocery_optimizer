@@ -39,9 +39,17 @@ core") are DONE and stay listed for history; v2 step numbering restarts at 2
   blocks (recall over precision). `coarse_category` added to source_products,
   canonical_products, gold_current_prices (ALTER IF NOT EXISTS migration in
   02_silver.sql). Tests: `tests/test_taxonomy.py`.
-- [ ] **4. LLM adjudicator + DuckDB verdict cache + human-review queue** — TODO
-  (distinct from the step-8 entity-resolution adjudicator above; this one is
-  category-guard adjudication per CLAUDE.md).
+- [x] **4. LLM adjudicator + DuckDB verdict cache + human-review queue** —
+  `silver/verdict_cache.py` + `grocery-adjudicate-list`: (normalized_list_term,
+  canonical_id) verdicts cached in `match_verdicts` (UNIQUE pair key, upsert);
+  cache consulted BEFORE any LLM call so each pair costs one call ever;
+  basket/gold selection reads ONLY the cache (`confident_matches` >= 0.85 +
+  heuristic fallback minus cached no_matches) -> deterministic replay.
+  Below-threshold verdicts stored but unusable until a human resolves them via
+  `match_review_queue` (`review_verdict`: approve keeps, reject flips, both ->
+  confidence 1.0, decided_by='human'). Category guard outranks the cache.
+  Distinct from the step-8 entity-resolution adjudicator (`grocery-adjudicate`).
+  Tests: `tests/test_verdict_cache.py`.
 - [x] **5. PWA frontend** — FastAPI (`api/app.py`, `grocery-serve`, port 8177)
   serving gold-only endpoints (`/api/verdict`, `/api/basket`); one-screen
   mobile PWA (`webapp/`: verdict hero, ranked stores, coverage flags,
@@ -70,10 +78,11 @@ uv run grocery-kcl-fetch        # Aldi via KCL
 uv run grocery-lidl-probe       # Lidl overview
 uv run grocery-normalize [--rebuild]   # bronze -> silver -> gold + resolve
 uv run grocery-adjudicate [--limit N]  # LLM entity adjudicator (spends API credits)
+uv run grocery-adjudicate-list [--limit N] [--dry-run]  # list-term adjudicator -> verdict cache
 uv run grocery-optimize         # synthetic basket -> single-store verdict (split as footnote)
 uv run grocery-seed-demo        # deterministic synthetic demo dataset (no creds)
 uv run grocery-serve            # FastAPI + verdict PWA on http://localhost:8177
-uv run pytest                   # 77 tests
+uv run pytest                   # 84 tests
 ```
 Latest run: no single in-range store covers all 26 items yet (thin cross-store
 recall, see limitation 3 below), so the split ($124.99 across 4 stores) is
@@ -82,7 +91,10 @@ modes already diverge on real data (e.g. kroger covers 14/26 in exact mode vs
 12/26 in flexible, at different totals).
 
 ## Known limitations (next-up work)
-1. **Item selection is heuristic** — keyword matching picks odd products ("Chicken Breast Bites" for chicken, milk-as-quart). Fix = the step-8 **plan narrator / LLM** picking the right canonical.
+1. **Item selection is heuristic until the verdict cache warms** — keyword
+   matching picks odd products ("Chicken Breast Bites" for chicken). v2 step 4
+   fixes this as the cache fills: run `grocery-adjudicate-list` once per new
+   candidate set and cached verdicts override the heuristic deterministically.
 2. **Size normalization** — multi-unit packs ("1 oz 16 ct", 10-lb potato bag) take the first size token in `units.py`, so some unit-price/spread comparisons are apples-to-oranges (e.g. Russet Potato $5.99 vs $1.29).
 3. **Cross-store recall is thin** (~6 of 1531 canonicals at 2+ stores) — grows by draining the ~575-pair `resolution_queue` via `grocery-adjudicate` (set `GROCERY_ADJUDICATOR_MODEL=claude-haiku-4-5` to cut cost). This is also why no store wins outright yet — verdict logic is correct but starved of coverage.
 4. **Exact-brand mode is a confidence-threshold proxy, not real brand tracking** — `basket_items`/canonical products have no "requested brand" field yet (no real user-entered lists exist), so v2-step-2's "exact brands" mode approximates it via a stricter `match_confidence >= 0.97` cutoff. Revisit once category taxonomy (v2 step 3) and real user lists land.
