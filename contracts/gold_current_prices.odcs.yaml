@@ -1,0 +1,162 @@
+# Open Data Contract Standard (ODCS) v3 contract for the pipeline's primary
+# query surface. This is not documentation that drifts: tests/test_contract.py
+# holds the live DuckDB view to every property listed here (names AND types),
+# so a schema change that breaks the contract breaks the build.
+apiVersion: v3.0.1
+kind: DataContract
+id: grocery-optimizer.gold.current-prices
+name: Gold current prices
+version: 1.0.0
+status: active
+domain: grocery-pricing
+dataProduct: grocery-basket-optimizer
+tenant: hemangnagar
+
+description:
+  purpose: >
+    The latest trusted price per (source product, store): every user-facing
+    number in the verdict PWA traces back to a row of this view, and via
+    price_id / bronze_manifest_id back to silver and the raw bronze artifact.
+  usage: >
+    Read-only. Consumers are the verdict engine, the FastAPI gold endpoints,
+    and the audited weekly narrator. Rows are already trust-gated
+    (match_confidence >= 0.85) and radius-filtered; consumers must not relax
+    either rule downstream.
+  limitations: >
+    Prices at stores beyond the configured home radius are excluded. A store
+    with unknown coordinates is never excluded (recall over precision).
+    regular_price is present only for promotional prices.
+
+schema:
+  - name: gold_current_prices
+    physicalName: gold_current_prices
+    logicalType: object
+    physicalType: view
+    description: Latest trusted price per (source product, store), radius-filtered.
+    properties:
+      - name: canonical_id
+        logicalType: integer
+        physicalType: BIGINT
+        required: true
+        description: Canonical product identity every price resolves to.
+      - name: canonical_name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: Canonical product display name.
+      - name: category
+        logicalType: string
+        physicalType: VARCHAR
+        description: Raw source category hint, free-form.
+      - name: coarse_category
+        logicalType: string
+        physicalType: VARCHAR
+        description: >
+          Deterministic taxonomy (produce|protein|dairy|snack|pantry|frozen|
+          household). Matches never cross categories.
+      - name: canonical_unit
+        logicalType: string
+        physicalType: VARCHAR
+        description: Package unit of the canonical product (lb|oz|fl_oz|count|each).
+      - name: source
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: Data source key (kroger|wholefoods|traderjoes|aldi_kcl|...).
+      - name: store_id
+        logicalType: string
+        physicalType: VARCHAR
+        description: Physical store within the source; null for region-level prices.
+      - name: store_name
+        logicalType: string
+        physicalType: VARCHAR
+        description: Store display name.
+      - name: store_region
+        logicalType: string
+        physicalType: VARCHAR
+        description: Store region label.
+      - name: distance_miles
+        logicalType: number
+        physicalType: DOUBLE
+        description: >
+          Haversine miles from the configured home location; null when the
+          store or home has no coordinates. Always <= the configured radius
+          for rows in this view.
+      - name: ad_week
+        logicalType: date
+        physicalType: DATE
+        description: Wednesday-start week the observation belongs to.
+      - name: observed_at
+        logicalType: date
+        physicalType: TIMESTAMP WITH TIME ZONE
+        required: true
+        description: When the price was captured.
+      - name: price
+        logicalType: number
+        physicalType: DECIMAL(10,2)
+        description: Listed / sale package price in USD.
+      - name: regular_price
+        logicalType: number
+        physicalType: DECIMAL(10,2)
+        description: Pre-promo price in USD; null when the price is not promotional.
+      - name: unit_price
+        logicalType: number
+        physicalType: DECIMAL(12,4)
+        description: Canonical unit price in USD (multi-pack aware).
+      - name: unit
+        logicalType: string
+        physicalType: VARCHAR
+        description: Unit-price denominator ($/lb | $/oz | $/fl_oz | $/ct).
+      - name: is_promo
+        logicalType: boolean
+        physicalType: BOOLEAN
+        description: Whether the price is a promotional/ad price.
+      - name: discount_pct
+        logicalType: number
+        physicalType: DOUBLE
+        description: Percent off regular price; null when not promotional.
+      - name: promo_text
+        logicalType: string
+        physicalType: VARCHAR
+        description: Raw promo phrasing ("2 for $5", "BOGO").
+      - name: source_product_id
+        logicalType: integer
+        physicalType: BIGINT
+        required: true
+        description: Silver source-product row this price belongs to.
+      - name: match_confidence
+        logicalType: number
+        physicalType: DOUBLE
+        required: true
+        description: >
+          Entity-resolution confidence (0-1). Every row in this view is at or
+          above the 0.85 trust gate; below-gate matches sit in the review
+          queue and are never surfaced.
+      - name: price_id
+        logicalType: integer
+        physicalType: BIGINT
+        required: true
+        description: Provenance key into silver prices (cited by the narrator).
+      - name: bronze_manifest_id
+        logicalType: integer
+        physicalType: BIGINT
+        description: Provenance key to the raw bronze artifact on disk.
+
+quality:
+  - rule: trustGate
+    description: All rows satisfy match_confidence >= 0.85.
+    dimension: accuracy
+  - rule: radiusFilter
+    description: >
+      No row's distance_miles exceeds the configured home radius; null
+      distance is permitted (unknown never excludes).
+    dimension: completeness
+  - rule: latestOnly
+    description: At most one row per (source_product_id, store_id).
+    dimension: uniqueness
+
+slaProperties:
+  - property: frequency
+    value: weekly
+    unit: d
+    driver: operational

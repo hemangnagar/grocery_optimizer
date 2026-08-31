@@ -37,6 +37,20 @@ load_dotenv(_ENV_PATH, override=True)
 HOME_ZIP = os.environ.get("HOME_ZIP", "22180")  # Vienna, VA
 SEARCH_RADIUS_MILES = int(os.environ.get("SEARCH_RADIUS_MILES", "5"))
 
+
+def _float_env(name: str) -> float | None:
+    raw = os.environ.get(name)
+    try:
+        return float(raw) if raw not in (None, "") else None
+    except ValueError:
+        return None
+
+
+# Optional exact home coordinates. When set they override the static
+# zip-centroid geocode in silver.geo (required for zips outside its table).
+HOME_LAT = _float_env("HOME_LAT")
+HOME_LON = _float_env("HOME_LON")
+
 # Whole Foods store id for the home area (Vienna, VA). WFM's site resolves this
 # from geolocation; we pin it in config for the deterministic pull.
 WFM_STORE_ID = os.environ.get("WFM_STORE_ID", "10065")

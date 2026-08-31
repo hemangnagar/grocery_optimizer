@@ -77,6 +77,13 @@ def main() -> None:
             price_s = f"${price:.2f}" if price is not None else "n/a"
             unit_s = f"{up} {unit}" if up is not None else ""
             print(f"  {source:<9} {price_s:>7}  {unit_s:>16}  {name}")
+
+        # OpenLineage: file always, collector only if OPENLINEAGE_URL is set.
+        from ..gold.lineage import emit_lineage
+
+        _, delivery = emit_lineage(con, "normalize", {**ing, **res})
+        note = f", {delivery} to collector" if delivery else ""
+        print(f"\nLineage event written to data/lineage/{note}.")
     finally:
         con.close()
 

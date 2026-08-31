@@ -7,6 +7,7 @@ name = "grocery-optimizer"
 version = "0.1.0"
 description = "DC-metro grocery price optimization pipeline (bronze/silver/gold on DuckDB)"
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.12"
 dependencies = [
     "duckdb>=1.1",
@@ -20,6 +21,7 @@ dependencies = [
     "pytz>=2024.1",
     "fastapi>=0.111",
     "uvicorn>=0.30",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +37,7 @@ grocery-kcl-fetch = "grocery_optimizer.scripts.kcl_fetch:main"
 grocery-normalize = "grocery_optimizer.scripts.normalize:main"
 grocery-wfm-fetch = "grocery_optimizer.scripts.wfm_fetch:main"
 grocery-kroger-fetch = "grocery_optimizer.scripts.kroger_fetch:main"
+grocery-kroger-locations = "grocery_optimizer.scripts.kroger_locations:main"
 grocery-tj-fetch = "grocery_optimizer.scripts.tj_fetch:main"
 grocery-optimize = "grocery_optimizer.scripts.optimize_basket:main"
 grocery-adjudicate = "grocery_optimizer.scripts.adjudicate:main"
@@ -42,6 +45,9 @@ grocery-seed-demo = "grocery_optimizer.scripts.seed_demo:main"
 grocery-adjudicate-list = "grocery_optimizer.scripts.adjudicate_list:main"
 grocery-narrate = "grocery_optimizer.scripts.narrate:main"
 grocery-serve = "grocery_optimizer.api.app:main"
+grocery-weekly-pull = "grocery_optimizer.scripts.weekly_pull:main"
+grocery-heal-parsers = "grocery_optimizer.scripts.heal_parsers:main"
+grocery-verify-contract = "grocery_optimizer.gold.contract:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/grocery_optimizer"]

@@ -76,6 +76,7 @@
   }
   .chip.full { background: var(--accent-soft); color: var(--accent); }
   .chip.partial { background: var(--warn-soft); color: var(--warn); }
+  .chip.dist { background: transparent; border: 1px solid var(--line); color: var(--muted); }
 
   .stores { display: flex; flex-direction: column; gap: 8px; }
   .store {
@@ -152,11 +153,20 @@
     return (data.banners && data.banners[source]) || source;
   }
 
+  // Distance from home to the source's nearest in-range store (gold_stores
+  // haversine; null until that chain's lat/lon is populated).
+  function distChip(s) {
+    return s.distance_miles != null
+      ? ' <span class="chip dist">' + s.distance_miles.toFixed(1) + " mi</span>"
+      : "";
+  }
+
   function storeCard(s, winnerTotal) {
     const missing = s.missing_labels || [];
-    const coverage = s.full_coverage
+    const coverage = (s.full_coverage
       ? '<span class="chip full">covers ' + s.items_covered + "/" + s.n_items + "</span>"
-      : '<span class="chip partial">missing ' + missing.length + " of " + s.n_items + "</span>";
+      : '<span class="chip partial">missing ' + missing.length + " of " + s.n_items + "</span>")
+      + distChip(s);
     const delta = winnerTotal != null && s.store_total > winnerTotal
       ? "+" + fmt(s.store_total - winnerTotal) + " vs winner"
       : "";
@@ -189,7 +199,7 @@
         '<div class="hero"><p class="kicker">This week, shop at</p>' +
         "<h1>" + bannerOf(winner.source) + "</h1>" +
         '<div class="total">' + fmt(winner.store_total) + "</div>" +
-        '<span class="chip full">covers all ' + winner.n_items + " items</span>" +
+        '<span class="chip full">covers all ' + winner.n_items + " items</span>" + distChip(winner) +
         '<p class="delta">' + deltaLine + "</p></div>";
       html += '<div class="stores">' + others.map((s) => storeCard(s, winner.store_total)).join("") + "</div>";
     } else if (stores.length) {

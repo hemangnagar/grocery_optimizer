@@ -43,6 +43,17 @@ CREATE TABLE IF NOT EXISTS stores (
     PRIMARY KEY (source, store_id)
 );
 
+-- Home location (single row, rewritten by init_db from config via
+-- silver.geo.refresh_home_location): lets gold views compute store distance
+-- and apply the SEARCH_RADIUS_MILES filter in SQL. Empty table = no filter.
+CREATE TABLE IF NOT EXISTS home_location (
+    home_zip     VARCHAR PRIMARY KEY,
+    lat          DOUBLE NOT NULL,
+    lon          DOUBLE NOT NULL,
+    radius_miles DOUBLE NOT NULL,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Canonical products: the normalized identity every price resolves to.
 CREATE TABLE IF NOT EXISTS canonical_products (
     canonical_id    BIGINT PRIMARY KEY DEFAULT nextval('seq_canonical_id'),
@@ -131,6 +142,26 @@ CREATE TABLE IF NOT EXISTS match_review_queue (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     resolved_at TIMESTAMPTZ,
     resolved_by VARCHAR
+);
+
+-- Parser self-healing patches (agentic layer #1): every LLM-proposed parser
+-- patch, promoted or rejected, with the validation evidence. Promoted patches
+-- overlay the builtin parser at ingest (builtin stays the fallback); the code
+-- itself lives on disk under data/parser_patches/ (sha-addressed, auditable),
+-- never written back into the repo source.
+CREATE SEQUENCE IF NOT EXISTS seq_parser_patch_id START 1;
+CREATE TABLE IF NOT EXISTS parser_patches (
+    patch_id               BIGINT PRIMARY KEY DEFAULT nextval('seq_parser_patch_id'),
+    source                 VARCHAR NOT NULL,
+    status                 VARCHAR NOT NULL,     -- promoted|rejected
+    reason                 VARCHAR,              -- rejection reason / promotion note
+    code_sha256            VARCHAR,
+    code_path              VARCHAR,              -- relative to data/parser_patches/
+    structure_diff         VARCHAR,              -- old-vs-new raw structure summary
+    drift_manifest_id      BIGINT,               -- the artifact that failed
+    known_good_manifest_id BIGINT,               -- the artifact the gate replayed
+    model                  VARCHAR,
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Human review queue: below-threshold entity matches never flow silently into

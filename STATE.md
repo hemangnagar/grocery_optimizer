@@ -1,6 +1,6 @@
 # Project State — grocery-optimizer
 
-_Working handoff doc. Last updated 2026-08-04._
+_Working handoff doc. Last updated 2026-08-31._
 
 ## Build-order status (see CLAUDE.md for the plan)
 
@@ -16,8 +16,10 @@ core") are DONE and stay listed for history; v2 step numbering restarts at 2
 - [x] **4. Whole Foods** — replicated JSON API via httpx (not Playwright); Vienna store 10065.
 - [x] **5. Silver normalize + RapidFuzz resolution** — units, canonical unit prices, conservative token_sort_ratio matching.
 - [x] **6. Synthetic basket + optimizer + gold savings view** — `grocery-optimize`.
-- [ ] **7. Windows Task Scheduler Tuesday-night pull** — TODO.
-- [~] **8. Agentic layer** — entity-resolution **adjudicator DONE** (`grocery-adjudicate`); parser self-healing + plan narrator TODO.
+- [x] **7. Windows Task Scheduler Tuesday-night pull** — `grocery-weekly-pull`
+  + `ops/register_weekly_pull.ps1` (see v2 step 6 below).
+- [x] **8. Agentic layer** — entity-resolution adjudicator (`grocery-adjudicate`),
+  weekly narrator (`grocery-narrate`), parser self-healing (`grocery-heal-parsers`).
 
 ### v2 pivot build order
 - [x] **2. Single-store verdict engine** — `silver/verdict.py` (`build_verdict`):
@@ -59,8 +61,14 @@ core") are DONE and stay listed for history; v2 step numbering restarts at 2
   diverge (flexible → Harris Teeter $123.17; exact → Whole Foods, kroger's two
   0.90-conf store-brand subs drop out) and Aldi is cheap-but-partial. Demo
   screenshots in `docs/screenshots/`, embedded in README. Tests: `tests/test_api.py`.
-- [ ] **6. Windows Task Scheduler job** — TODO (same as pre-pivot step 7).
-- [~] **7. Parser self-healing agent + weekly narrator** — **narrator DONE**
+- [x] **6. Windows Task Scheduler job** — `grocery-weekly-pull` chains
+  store-location refresh + all fetchers + normalize with per-stage error
+  isolation (a chain outage or missing creds never blocks the rest) and an
+  append-only run log (`data/logs/weekly_pull.log`). LLM stages deliberately
+  excluded from the scheduled run. `ops/register_weekly_pull.ps1` registers
+  the Tuesday 21:30 schtasks job on the UM870 (`-Unregister` removes it) —
+  REGISTRATION STILL NEEDS TO BE RUN ON THE HOME BOX.
+- [x] **7. Parser self-healing agent + weekly narrator** — **narrator DONE**
   (`gold/narrator.py`, `grocery-narrate`): deterministic fact pack from the
   verdict engine (every total/delta/count precomputed + gold price_id
   provenance) -> LLM writes one paragraph -> hard audit gate rejects any
@@ -68,8 +76,36 @@ core") are DONE and stay listed for history; v2 step numbering restarts at 2
   stored in `narrations` with pipeline-appended citations. `/api/narrative`
   + PWA serve ONLY stored rows (narrate once weekly, zero tokens per view).
   `--facts-only` previews for free. Tests: `tests/test_narrator.py`.
-  Parser self-healing agent TODO.
-- [ ] **8. Showcase phase** — TODO.
+  **Parser self-healing agent DONE** (`silver/parser_heal.py`,
+  `grocery-heal-parsers [--dry-run|--force]`): drift detection (parser raises,
+  or zero records + ADDED structure paths vs the last known-good artifact —
+  legit empty payloads only remove paths, never flagged), LLM proposes a
+  replacement `parse(raw)`, deterministic gate promotes only if the patch
+  reproduces the current parser byte-for-byte on known-good bronze AND emits
+  schema-exact records on the drifted artifact. Promoted patches live
+  sha-addressed in `data/parser_patches/` + `parser_patches` table;
+  `ingest_bronze` overlays them (builtin fallback) and now isolates per-artifact
+  failures ('error'/'empty', retried once healed). Tests: `tests/test_parser_heal.py`.
+- [~] **8. Showcase phase** — in-repo parts DONE (MIT `LICENSE`, README
+  architecture/license/data-note, secrets hygiene re-verified: only `.env` +
+  `data/` hold sensitive material and both are gitignored). Remaining are
+  user-side: two-repo split decision, demo video, deck, re-screenshot PWA with
+  real data + distance chips.
+
+### Post-pivot additions (2026-08-31 session)
+- **Geolocation + store coverage** (the agreed next feature): `silver/geo.py`
+  (haversine, static DC-metro zip→centroid table for HOME_ZIP, HOME_LAT/LON
+  .env override), single-row `home_location` table refreshed by `init_db`,
+  `gold_stores` view with `distance_miles`, and `gold_current_prices` now
+  EXCLUDES stores beyond `SEARCH_RADIUS_MILES` (NULL distance / empty home row
+  never excludes — recall over precision). Verdict carries per-source
+  nearest-store distance; PWA shows distance chips; `grocery-kroger-locations`
+  populates Kroger-family store lat/lon from the official Locations API
+  (bronze-first); demo seed has Vienna-area coordinates. Tests: `tests/test_geo.py`.
+- **Size normalization fixed** (old limitation 2): `parse_size` combines count
+  and measure tokens ("1 oz 16 ct" → 16 oz, "24 pack 16.9 fl oz" → 405.6
+  fl_oz, "10-lb bag" → 160 oz, "half gallon", "dozen"); `base_qty` is now the
+  total take-home quantity.
 
 ## Coverage (in gold now)
 Kroger/Harris Teeter (~1561, official API, commercially safe) · Whole Foods (~180, open API, safe) ·
@@ -78,20 +114,23 @@ Investigated but DEFERRED: Safeway (`xapi`, brittle/ToS), Giant (Ahold, gated).
 
 ## How to run
 ```powershell
-uv run grocery-init-db          # (re)build schema
+uv run grocery-init-db          # (re)build schema (+ refresh home_location)
+uv run grocery-weekly-pull [--skip a,b]  # the whole ingest: locations + fetchers + normalize
+uv run grocery-kroger-locations # store lat/lon via Kroger Locations API
 uv run grocery-kroger-fetch     # Kroger catalog (needs KROGER_* in .env)
 uv run grocery-wfm-fetch        # Whole Foods
 uv run grocery-tj-fetch         # Trader Joe's (Edge/Playwright)
 uv run grocery-kcl-fetch        # Aldi via KCL
 uv run grocery-lidl-probe       # Lidl overview
 uv run grocery-normalize [--rebuild]   # bronze -> silver -> gold + resolve
+uv run grocery-heal-parsers [--dry-run]  # parser self-healing (LLM unless --dry-run)
 uv run grocery-adjudicate [--limit N]  # LLM entity adjudicator (spends API credits)
 uv run grocery-adjudicate-list [--limit N] [--dry-run]  # list-term adjudicator -> verdict cache
 uv run grocery-narrate [--facts-only]  # audited weekly narration -> narrations table + PWA
 uv run grocery-optimize         # synthetic basket -> single-store verdict (split as footnote)
 uv run grocery-seed-demo        # deterministic synthetic demo dataset (no creds)
 uv run grocery-serve            # FastAPI + verdict PWA on http://localhost:8177
-uv run pytest                   # 91 tests
+uv run pytest                   # 120 tests
 ```
 Latest run: no single in-range store covers all 26 items yet (thin cross-store
 recall, see limitation 3 below), so the split ($124.99 across 4 stores) is
@@ -104,9 +143,17 @@ modes already diverge on real data (e.g. kroger covers 14/26 in exact mode vs
    matching picks odd products ("Chicken Breast Bites" for chicken). v2 step 4
    fixes this as the cache fills: run `grocery-adjudicate-list` once per new
    candidate set and cached verdicts override the heuristic deterministically.
-2. **Size normalization** — multi-unit packs ("1 oz 16 ct", 10-lb potato bag) take the first size token in `units.py`, so some unit-price/spread comparisons are apples-to-oranges (e.g. Russet Potato $5.99 vs $1.29).
+2. ~~Size normalization~~ — FIXED 2026-08-31 (multi-unit packs, hyphenated
+   sizes, half/dozen forms; see Post-pivot additions). NOTE: silver rows
+   normalized before the fix keep their old unit_price until re-ingested
+   (`grocery-normalize --rebuild` re-resolves links but prices recompute only
+   on re-parse; simplest full refresh: re-run fetches or re-parse bronze).
 3. **Cross-store recall is thin** (~6 of 1531 canonicals at 2+ stores) — grows by draining the ~575-pair `resolution_queue` via `grocery-adjudicate` (set `GROCERY_ADJUDICATOR_MODEL=claude-haiku-4-5` to cut cost). This is also why no store wins outright yet — verdict logic is correct but starved of coverage.
 4. **Exact-brand mode is a confidence-threshold proxy, not real brand tracking** — `basket_items`/canonical products have no "requested brand" field yet (no real user-entered lists exist), so v2-step-2's "exact brands" mode approximates it via a stricter `match_confidence >= 0.97` cutoff. Revisit once category taxonomy (v2 step 3) and real user lists land.
+5. **Zip-centroid geocode covers NoVA/DC-core only** — a HOME_ZIP outside
+   `silver/geo.py`'s table needs the HOME_LAT/HOME_LON .env override, and only
+   Kroger-family stores get real coordinates today (other chains' stores have
+   NULL lat/lon and are never radius-filtered).
 
 ## Environment / ops notes
 - Secrets in **project `.env` only** (gitignored): `KROGER_CLIENT_ID/SECRET`, `ANTHROPIC_API_KEY`. `config.py` loads `.env` with `override=True`.
@@ -114,22 +161,19 @@ modes already diverge on real data (e.g. kroger covers 14/26 in exact mode vs
 - `git` is not on PATH — PortableGit at `%LOCALAPPDATA%\Programs\PortableGit\cmd`; prepend it per command. Branch `main`; remote `origin` set (GitHub), nothing pushed. `data/` is gitignored (the moat).
 
 ## Suggested next steps
-_(updated 2026-08-04 — steps 3/4/5 + narrator shipped this session)_
+_(updated 2026-08-31 — geolocation, size fix, weekly-pull, self-healing agent,
+and in-repo showcase polish all shipped this session; the code side of the
+build order is complete)_
 
 On the home box (needs .env / Windows):
-- `git pull origin main && uv sync`, then `uv run grocery-normalize` on the
-  real DB (backfills taxonomy + severs cross-category links) → drain
-  `resolution_queue` via `grocery-adjudicate` (Haiku for cost) to grow
-  cross-store recall → `grocery-adjudicate-list` to warm the verdict cache →
-  `grocery-narrate` for the first real audited narration → re-screenshot the
-  PWA showing verdict + narrative.
-- v2 step 6: Windows Task Scheduler Tuesday-night pull.
+- `git pull && uv sync`, then `powershell -ExecutionPolicy Bypass -File
+  ops\register_weekly_pull.ps1` to register the Tuesday-night pull.
+- `uv run grocery-kroger-locations` once so real stores get lat/lon (the gold
+  radius filter is a no-op until then), then `uv run grocery-normalize` on the
+  real DB → drain `resolution_queue` via `grocery-adjudicate` (Haiku for cost)
+  → `grocery-adjudicate-list` to warm the verdict cache → `grocery-narrate` →
+  re-screenshot the PWA (verdict + narrative + distance chips).
 
-Remote-session friendly (no creds needed):
-- **Geolocation + store coverage** (agreed next feature): populate `stores`
-  lat/lon via chain locator APIs (Kroger Locations API is official), static
-  zip→centroid geocode for HOME_ZIP, haversine radius filter in gold, PWA
-  distance chips, demo-seed lat/lons. Groundwork exists: `config.HOME_ZIP`,
-  `SEARCH_RADIUS_MILES`, empty `stores.lat/lon/zip` columns.
-- Parser self-healing agent (last dashed box on the diagram) → size
-  normalization fix (limitation 2) → step 8 showcase polish.
+User-side showcase (step 8 remainder):
+- Decide the two-repo split (this repo is already clean: no data, no secrets),
+  record the demo video, build the deck.

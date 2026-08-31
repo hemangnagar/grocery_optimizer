@@ -204,6 +204,30 @@ def parse_tj_products(raw: bytes) -> list[dict]:
     return records
 
 
+# The builtin bronze->silver parsers, keyed by source. The self-healing agent
+# (silver.parser_heal) reads this to diff a drifted payload against what the
+# current parser expects, and ingest_bronze overlays promoted patches on top.
+BUILTIN_PARSERS = {
+    "kroger": parse_kroger_products,
+    "aldi_kcl": parse_kcl_records,
+    "wholefoods": parse_wfm_products,
+    "traderjoes": parse_tj_products,
+}
+
+
+def _with_fallback(patched, builtin):
+    """Prefer the promoted patch; if IT breaks (e.g. the site reverted), the
+    builtin gets a shot before the manifest is marked 'error'."""
+
+    def parse(raw: bytes) -> list[dict]:
+        try:
+            return patched(raw)
+        except Exception:
+            return builtin(raw)
+
+    return parse
+
+
 def _upsert_source_product(con, rec: dict, fetched_at, manifest_id: int) -> int:
     coarse = coarse_category(rec["category_hint"], rec["raw_name"])
     existing = None
@@ -262,11 +286,13 @@ def _insert_price(con, spid: int, rec: dict, manifest, fetched_at) -> None:
 
 
 def _pending_manifests(con) -> list[dict]:
+    # 'error' rows are retried: they re-parse cleanly once a promoted parser
+    # patch (silver.parser_heal) covers the drift, and retrying is cheap.
     rows = con.execute(
         """
         SELECT manifest_id, source, raw_path, fetched_at, store_id, region
         FROM bronze_manifest
-        WHERE parse_status = 'pending'
+        WHERE parse_status IN ('pending', 'error', 'empty')
           AND (
                 (source = 'kroger'
                  AND json_extract_string(request_params, '$.endpoint') = 'products')
@@ -286,18 +312,43 @@ def ingest_bronze(con: duckdb.DuckDBPyConnection) -> dict:
 
     Returns counts: ``{manifests, source_products, prices}``.
     """
-    parsers = {
-        "kroger": parse_kroger_products,
-        "aldi_kcl": parse_kcl_records,
-        "wholefoods": parse_wfm_products,
-        "traderjoes": parse_tj_products,
-    }
-    counts = {"manifests": 0, "source_products": 0, "prices": 0}
+    # Promoted self-healing patches (silver.parser_heal) take precedence, with
+    # the builtin as fallback; the deterministic validation gate has already
+    # proven any promoted patch reproduces the builtin on known-good bronze.
+    from .parser_heal import load_promoted_parser
+
+    parsers = dict(BUILTIN_PARSERS)
+    for source, builtin in BUILTIN_PARSERS.items():
+        patched = load_promoted_parser(con, source)
+        if patched is not None:
+            parsers[source] = _with_fallback(patched, builtin)
+
+    counts = {"manifests": 0, "source_products": 0, "prices": 0, "parse_errors": 0}
 
     for manifest in _pending_manifests(con):
         raw = (config.BRONZE_DIR / manifest["raw_path"]).read_bytes()
         fetched_at = manifest["fetched_at"] or datetime.now(timezone.utc)
-        records = parsers[manifest["source"]](raw)
+        # Parse fully BEFORE inserting anything, so a drifted artifact marks
+        # 'error' (for the self-healing agent) without partial silver rows and
+        # without aborting the other sources' ingest.
+        try:
+            records = parsers[manifest["source"]](raw)
+        except Exception:
+            con.execute(
+                "UPDATE bronze_manifest SET parse_status = 'error' WHERE manifest_id = ?",
+                [manifest["manifest_id"]],
+            )
+            counts["parse_errors"] += 1
+            continue
+        if not records:
+            # Could be a legitimately empty payload OR silent drift (renamed
+            # key). 'empty' keeps it visible to the self-healing agent and
+            # retryable once a patch is promoted; re-parsing [] is free.
+            con.execute(
+                "UPDATE bronze_manifest SET parse_status = 'empty' WHERE manifest_id = ?",
+                [manifest["manifest_id"]],
+            )
+            continue
         for rec in records:
             spid = _upsert_source_product(con, rec, fetched_at, manifest["manifest_id"])
             _insert_price(con, spid, rec, manifest, fetched_at)
