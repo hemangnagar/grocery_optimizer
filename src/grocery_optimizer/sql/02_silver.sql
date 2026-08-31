@@ -144,6 +144,26 @@ CREATE TABLE IF NOT EXISTS match_review_queue (
     resolved_by VARCHAR
 );
 
+-- Parser self-healing patches (agentic layer #1): every LLM-proposed parser
+-- patch, promoted or rejected, with the validation evidence. Promoted patches
+-- overlay the builtin parser at ingest (builtin stays the fallback); the code
+-- itself lives on disk under data/parser_patches/ (sha-addressed, auditable),
+-- never written back into the repo source.
+CREATE SEQUENCE IF NOT EXISTS seq_parser_patch_id START 1;
+CREATE TABLE IF NOT EXISTS parser_patches (
+    patch_id               BIGINT PRIMARY KEY DEFAULT nextval('seq_parser_patch_id'),
+    source                 VARCHAR NOT NULL,
+    status                 VARCHAR NOT NULL,     -- promoted|rejected
+    reason                 VARCHAR,              -- rejection reason / promotion note
+    code_sha256            VARCHAR,
+    code_path              VARCHAR,              -- relative to data/parser_patches/
+    structure_diff         VARCHAR,              -- old-vs-new raw structure summary
+    drift_manifest_id      BIGINT,               -- the artifact that failed
+    known_good_manifest_id BIGINT,               -- the artifact the gate replayed
+    model                  VARCHAR,
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Human review queue: below-threshold entity matches never flow silently into
 -- gold. The adjudicator agent parks ambiguous matches here.
 CREATE TABLE IF NOT EXISTS resolution_queue (
