@@ -127,6 +127,24 @@ fetchers. For real data, the whole weekly ingest is one command —
 `uv run grocery-weekly-pull` — and `ops/register_weekly_pull.ps1` registers it
 as a Tuesday-night Windows Task Scheduler job (ads refresh Wednesdays).
 
+## Data contract &amp; lineage
+
+The gold layer's promise to its consumers is written down as an
+[Open Data Contract Standard](https://bitol.io/) (ODCS v3) contract —
+[`contracts/gold_current_prices.odcs.yaml`](contracts/gold_current_prices.odcs.yaml)
+— and the contract is **enforceable, not documentation**: tests hold the live
+DuckDB schema to every property (names and types, both directions) and run
+each declared quality rule (trust gate, radius filter, uniqueness) as a real
+query. `uv run grocery-verify-contract` does the same on demand; schema drift
+breaks the build.
+
+Every normalize run also emits a spec-conformant
+[OpenLineage](https://openlineage.io/) RunEvent — bronze manifests in, gold
+views (with schema facets) out — to `data/lineage/` unconditionally, and to a
+collector (e.g. Marquez) when `OPENLINEAGE_URL` is set. Emit, never depend:
+no collector is required, and a failed lineage POST never fails the run it
+describes.
+
 ## Layout
 
 ```

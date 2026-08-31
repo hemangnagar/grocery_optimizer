@@ -21,6 +21,7 @@ dependencies = [
     "pytz>=2024.1",
     "fastapi>=0.111",
     "uvicorn>=0.30",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -46,6 +47,7 @@ grocery-narrate = "grocery_optimizer.scripts.narrate:main"
 grocery-serve = "grocery_optimizer.api.app:main"
 grocery-weekly-pull = "grocery_optimizer.scripts.weekly_pull:main"
 grocery-heal-parsers = "grocery_optimizer.scripts.heal_parsers:main"
+grocery-verify-contract = "grocery_optimizer.gold.contract:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/grocery_optimizer"]
