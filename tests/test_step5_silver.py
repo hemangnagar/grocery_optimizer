@@ -33,6 +33,16 @@ FIXTURES = Path(__file__).parent / "fixtures"
         ("2 lb", "oz", 32.0),
         ("per lb", "oz", 16.0),
         ("10 ct", "ct", 10.0),
+        # Multi-unit packs (limitation-2 fix): counts multiply into the measure.
+        ("1 oz 16 ct", "oz", 16.0),
+        ("6 ct 1.5 oz", "oz", 9.0),
+        ("24 pack 16.9 fl oz", "fl_oz", 405.6),
+        ("2 pk 6 ct", "ct", 12.0),
+        ("10-lb bag", "oz", 160.0),
+        ("half gallon", "fl_oz", 64.0),
+        ("1 dozen", "ct", 12.0),
+        # Restated measures keep the first, never multiply ("16 oz (1 lb)").
+        ("16 oz 1 lb", "oz", 16.0),
     ],
 )
 def test_parse_size(text, base_unit, base_qty):

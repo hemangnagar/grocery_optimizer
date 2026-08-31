@@ -6,7 +6,13 @@ package sizes are comparable:
 
   - volume  -> base "fl_oz"  (gal=128, qt=32, pt=16, L=33.814, ml=0.033814)
   - weight  -> base "oz"     (lb=16, oz=1, kg=35.274, g=0.035274)
-  - count   -> base "ct"     (ct/pk/each = magnitude)
+  - count   -> base "ct"     (ct/pk/each = magnitude, dozen = 12)
+
+Multi-unit packs combine count and measure tokens: "1 oz 16 ct" is 16 oz of
+product, "24 pack 16.9 fl oz" is 405.6 fl_oz, "2 pk 6 ct" is 12 ct. When both
+a count and a weight/volume appear, the measure wins as the base unit and the
+counts multiply into it; measure-only strings with several measure tokens keep
+the FIRST (later ones usually restate the same size, e.g. "16 oz 1 lb").
 
 Ambiguity note: a bare "oz" is treated as WEIGHT; fluid volume must say "fl oz".
 """
@@ -34,6 +40,7 @@ _COUNT = {
     "ct": 1.0, "count": 1.0, "cnt": 1.0,
     "pk": 1.0, "pack": 1.0, "pks": 1.0,
     "ea": 1.0, "each": 1.0,
+    "dozen": 12.0, "doz": 12.0,
 }
 
 _MEASURES = (("fl_oz", _VOLUME), ("oz", _WEIGHT), ("ct", _COUNT))
@@ -42,9 +49,10 @@ _ALL_TOKENS = sorted(
     {tok for _, m in _MEASURES for tok in m}, key=len, reverse=True
 )
 _TOKEN_ALT = "|".join(re.escape(t) for t in _ALL_TOKENS)
-# magnitude: "1", "1.5", "1/2", or "1 1/2"; unit token follows.
+# magnitude: "1", "1.5", "1/2", or "1 1/2"; unit token follows, optionally
+# hyphenated ("10-lb bag").
 _SIZE_RE = re.compile(
-    rf"(?P<mag>\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?)\s*(?P<unit>{_TOKEN_ALT})\b",
+    rf"(?P<mag>\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?)[\s-]*(?P<unit>{_TOKEN_ALT})\b",
     re.IGNORECASE,
 )
 # "per lb" / "per each" style (magnitude implicitly 1)
@@ -71,30 +79,74 @@ def _base_for(unit: str):
     return None
 
 
+_HALF_RE = re.compile(r"\bhalf[\s-]+(?=gal|pint|quart|pound|dozen)")
+
+
 def parse_size(text: str | None) -> dict | None:
-    """Return {magnitude, unit, base_unit, base_qty} or None if unparseable."""
+    """Return {magnitude, unit, base_unit, base_qty[, pack_count]} or None.
+
+    ``base_qty`` is the TOTAL package quantity in ``base_unit`` — pack
+    multipliers included — so ``unit_price`` divides by what you actually
+    take home.
+    """
     if not text:
         return None
-    lowered = text.lower()
-    m = _SIZE_RE.search(lowered)
-    if m:
+    lowered = _HALF_RE.sub("0.5 ", text.lower())
+
+    measures: list[tuple[float, str, str, float]] = []  # (mag, unit, base_unit, base_qty)
+    counts: list[float] = []  # count contribution, dozen-expanded
+    for m in _SIZE_RE.finditer(lowered):
+        base = _base_for(m.group("unit"))
+        if base is None:
+            continue
+        base_unit, per_token = base
         magnitude = _parse_magnitude(m.group("mag"))
-        unit = m.group("unit")
-    else:
+        if base_unit == "ct":
+            counts.append(magnitude * per_token)
+        else:
+            measures.append(
+                (magnitude, m.group("unit"), base_unit, magnitude * per_token)
+            )
+
+    if not measures and not counts:
         p = _PER_RE.search(lowered)
         if not p:
             return None
-        magnitude = 1.0
-        unit = p.group("unit")
-    base = _base_for(unit)
-    if base is None:
-        return None
-    base_unit, per_token = base
+        base = _base_for(p.group("unit"))
+        if base is None:
+            return None
+        base_unit, per_token = base
+        return {
+            "magnitude": 1.0,
+            "unit": p.group("unit"),
+            "base_unit": base_unit,
+            "base_qty": per_token,
+        }
+
+    pack = 1.0
+    for c in counts:
+        pack *= c
+
+    if measures:
+        # Measure wins as the base; counts multiply in ("1 oz 16 ct" -> 16 oz).
+        # Extra measure tokens are ignored: they restate the first.
+        magnitude, unit, base_unit, base_qty = measures[0]
+        result = {
+            "magnitude": magnitude,
+            "unit": unit,
+            "base_unit": base_unit,
+            "base_qty": base_qty * pack,
+        }
+        if counts:
+            result["pack_count"] = pack
+        return result
+
+    # Count-only: "12 ct" -> 12; nested packs multiply ("2 pk 6 ct" -> 12).
     return {
-        "magnitude": magnitude,
-        "unit": unit,
-        "base_unit": base_unit,
-        "base_qty": magnitude * per_token,
+        "magnitude": counts[0],
+        "unit": "ct",
+        "base_unit": "ct",
+        "base_qty": pack,
     }
 
 
