@@ -7,6 +7,7 @@ name = "grocery-optimizer"
 version = "0.1.0"
 description = "DC-metro grocery price optimization pipeline (bronze/silver/gold on DuckDB)"
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.12"
 dependencies = [
     "duckdb>=1.1",
