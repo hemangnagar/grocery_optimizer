@@ -43,6 +43,7 @@ grocery-seed-demo = "grocery_optimizer.scripts.seed_demo:main"
 grocery-adjudicate-list = "grocery_optimizer.scripts.adjudicate_list:main"
 grocery-narrate = "grocery_optimizer.scripts.narrate:main"
 grocery-serve = "grocery_optimizer.api.app:main"
+grocery-weekly-pull = "grocery_optimizer.scripts.weekly_pull:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/grocery_optimizer"]
