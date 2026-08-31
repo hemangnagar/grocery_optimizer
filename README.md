@@ -1,5 +1,8 @@
 # Grocery Basket Optimizer
 
+[![tests](https://github.com/hemangnagar/grocery_optimizer/actions/workflows/ci.yml/badge.svg)](https://github.com/hemangnagar/grocery_optimizer/actions/workflows/ci.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 A DC-metro grocery price optimization pipeline. Ingests weekly prices/deals from
 multiple chains (Giant, Safeway, Harris Teeter, Whole Foods, Aldi, Lidl),
 normalizes disparate sources into canonical products, and recommends the cheapest
