@@ -1,0 +1,34 @@
+{
+  "data": [
+    {
+      "locationId": "09700308",
+      "chain": "HARRISTEETER",
+      "name": "Harris Teeter - Dunn Loring",
+      "address": {
+        "addressLine1": "2425 Centreville Rd",
+        "city": "Vienna",
+        "state": "VA",
+        "zipCode": "22027"
+      },
+      "geolocation": {
+        "latitude": 38.8834,
+        "longitude": -77.2271
+      }
+    },
+    {
+      "locationId": "02900511",
+      "chain": "KROGER",
+      "name": "Kroger - No Geo (edge case)",
+      "address": {
+        "addressLine1": "1 Somewhere Pl",
+        "city": "Fairfax",
+        "state": "VA",
+        "zipCode": "22030"
+      }
+    },
+    {
+      "chain": "HARRISTEETER",
+      "name": "Broken row without locationId"
+    }
+  ]
+}

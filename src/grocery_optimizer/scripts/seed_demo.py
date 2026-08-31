@@ -34,11 +34,14 @@ from ..silver.normalize import _ad_week
 DEMO_BASKET_NAME = "Demo family-of-four week (synthetic)"
 DEMO_METHOD = "demo_seed"
 
+# source: (store_id, name, zip, lat, lon) — coordinates are plausible Vienna-VA
+# spots inside the default 5-mile home radius, so the distance chips render and
+# the radius filter keeps every demo store in play.
 _STORES = {
-    "kroger": ("HT-DEMO-1", "Harris Teeter Vienna (demo)"),
-    "wholefoods": ("WFM-DEMO-1", "Whole Foods Vienna (demo)"),
-    "traderjoes": ("TJ-DEMO-1", "Trader Joe's Vienna (demo)"),
-    "aldi_kcl": ("ALDI-DEMO-1", "Aldi Vienna (demo)"),
+    "kroger": ("HT-DEMO-1", "Harris Teeter Vienna (demo)", "22027", 38.8830, -77.2270),
+    "wholefoods": ("WFM-DEMO-1", "Whole Foods Vienna (demo)", "22180", 38.9000, -77.2650),
+    "traderjoes": ("TJ-DEMO-1", "Trader Joe's Vienna (demo)", "22180", 38.9010, -77.2680),
+    "aldi_kcl": ("ALDI-DEMO-1", "Aldi Merrifield (demo)", "22031", 38.8710, -77.2280),
 }
 
 # label -> (canonical name, coarse_category, size text,
@@ -141,11 +144,14 @@ def seed_demo(con: duckdb.DuckDBPyConnection) -> dict:
         "ON CONFLICT (source) DO NOTHING"
     )
 
-    for source, (store_id, name) in _STORES.items():
+    for source, (store_id, name, zip_code, lat, lon) in _STORES.items():
         con.execute(
-            "INSERT INTO stores (source, store_id, name, region) VALUES (?, ?, ?, 'demo') "
-            "ON CONFLICT (source, store_id) DO NOTHING",
-            [source, store_id, name],
+            "INSERT INTO stores (source, store_id, name, region, zip, lat, lon) "
+            "VALUES (?, ?, ?, 'demo', ?, ?, ?) "
+            "ON CONFLICT (source, store_id) DO UPDATE SET "
+            "name = excluded.name, zip = excluded.zip, "
+            "lat = excluded.lat, lon = excluded.lon",
+            [source, store_id, name, zip_code, lat, lon],
         )
 
     basket_id = con.execute(

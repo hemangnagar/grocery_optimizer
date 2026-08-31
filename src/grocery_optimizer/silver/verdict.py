@@ -53,14 +53,16 @@ def _store_totals(
     rows = con.execute(
         """
         WITH offers AS (
-            SELECT bi.label, g.source, bi.quantity, min(g.price) AS price
+            SELECT bi.label, g.source, bi.quantity, min(g.price) AS price,
+                   min(g.distance_miles) AS distance_miles
             FROM basket_items bi
             JOIN gold_current_prices g ON g.canonical_id = bi.canonical_id
             WHERE bi.basket_id = ? AND g.match_confidence >= ?
             GROUP BY bi.label, g.source, bi.quantity
         )
         SELECT source, list(DISTINCT label) AS covered_labels,
-               round(sum(price * quantity), 2) AS store_total
+               round(sum(price * quantity), 2) AS store_total,
+               min(distance_miles) AS distance_miles
         FROM offers
         GROUP BY source
         """,
@@ -68,7 +70,7 @@ def _store_totals(
     ).fetchall()
 
     results = []
-    for source, covered_labels, store_total in rows:
+    for source, covered_labels, store_total, distance_miles in rows:
         covered = set(covered_labels)
         missing = [label for label in all_labels if label not in covered]
         results.append(
@@ -77,6 +79,11 @@ def _store_totals(
                 "items_covered": len(covered),
                 "n_items": n_items,
                 "store_total": float(store_total),
+                # Nearest in-range store for this source (miles from home);
+                # None until the stores table has lat/lon for it.
+                "distance_miles": (
+                    float(distance_miles) if distance_miles is not None else None
+                ),
                 "missing_labels": missing,
                 "full_coverage": not missing,
             }

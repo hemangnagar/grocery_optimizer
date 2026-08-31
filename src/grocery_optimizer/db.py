@@ -40,10 +40,15 @@ def init_db(con: duckdb.DuckDBPyConnection | None = None) -> duckdb.DuckDBPyConn
     If ``con`` is None a connection to the project DB is opened and returned;
     pass an existing connection (e.g. an in-memory one) for tests.
     """
+    # Imported here: silver.geo depends on config, keeping db.py import-light.
+    from .silver.geo import refresh_home_location
+
     config.ensure_dirs()
     owns_con = con is None
     if owns_con:
         con = get_connection()
     for name in SCHEMA_FILES:
         apply_sql_file(con, config.SQL_DIR / name)
+    # Keep the gold radius filter in sync with the current .env.
+    refresh_home_location(con)
     return con

@@ -43,6 +43,17 @@ CREATE TABLE IF NOT EXISTS stores (
     PRIMARY KEY (source, store_id)
 );
 
+-- Home location (single row, rewritten by init_db from config via
+-- silver.geo.refresh_home_location): lets gold views compute store distance
+-- and apply the SEARCH_RADIUS_MILES filter in SQL. Empty table = no filter.
+CREATE TABLE IF NOT EXISTS home_location (
+    home_zip     VARCHAR PRIMARY KEY,
+    lat          DOUBLE NOT NULL,
+    lon          DOUBLE NOT NULL,
+    radius_miles DOUBLE NOT NULL,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Canonical products: the normalized identity every price resolves to.
 CREATE TABLE IF NOT EXISTS canonical_products (
     canonical_id    BIGINT PRIMARY KEY DEFAULT nextval('seq_canonical_id'),
