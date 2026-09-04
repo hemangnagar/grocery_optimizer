@@ -1,0 +1,50 @@
+{
+  "date": "2026-09-04",
+  "repo": "grocery_optimizer",
+  "milestone": "Open-source showcase launch: MIT license, CI, self-healing agent, README polish (34 commits, first retro)",
+  "since": null,
+  "interview": {
+    "goal": "Weekly cheapest-store answer for the family's grocery list. Changed once, materially: v1's multi-store basket split was demoted to a footnote after judging that nobody drives to three stores to save $18 \u2014 v2's product is a single-store verdict. [confirmed by user]",
+    "slower_than_expected": "(user declined to record this answer \u2014 no lesson derived)",
+    "wrong_first": "(a) Fuzzy matching linked 'chicken' to chicken crackers; fixed with the layered category guard \u2014 deterministic taxonomy first, LLM only for survivors, every verdict cached. (b) The product premise itself: basket-splitting was behaviorally wrong; fixed by the v2 single-store-verdict pivot. [confirmed by user]",
+    "lb_candidates": "learned-behavior had no events for this workspace (degraded form used). Recurring friction: a globally-set ANTHROPIC_API_KEY silently switched Claude Code to API-rate billing until hunted down; gated/JS-walled sources (Giant, Safeway, Lidl product-level) repeatedly cost investigation time before being deferred. [confirmed by user]",
+    "answered_by": "user (Q1, Q3, Q4 confirmed; Q2 declined; scope calls delegated to agent)"
+  },
+  "lessons": [
+    {
+      "claim": "In any entity-resolution pipeline, block cross-category matches deterministically before fuzzy or LLM matching \u2014 string similarity must never cross a semantic category boundary.",
+      "evidence": [
+        "grocery_optimizer silver/taxonomy.py (v2 step 3)",
+        "STATE.md: chicken->chicken-crackers failure"
+      ],
+      "scope": "global",
+      "confidence": 0.85,
+      "written_to": "playbook:R7",
+      "hits": 0
+    },
+    {
+      "claim": "Never set ANTHROPIC_API_KEY in global machine environment variables on a box that runs Claude Code under a subscription \u2014 it silently switches billing to API rates; secrets live in per-project .env files.",
+      "evidence": [
+        "STATE.md environment notes (global key found and removed)",
+        "CLAUDE.md stack section"
+      ],
+      "scope": "stack:claude-code",
+      "confidence": 0.9,
+      "written_to": "playbook:R8",
+      "note": "Classifier suggested global; interview overrode to stack:claude-code \u2014 the rule is tooling-specific.",
+      "hits": 0
+    },
+    {
+      "claim": "When a product's primary output is a recommendation, validate that users would actually act on it before building optimization machinery for it.",
+      "evidence": [
+        "v2 pivot commit history (basket split -> single-store verdict)",
+        "CLAUDE.md v2 PIVOT section"
+      ],
+      "scope": "global",
+      "confidence": 0.7,
+      "written_to": "playbook:R9",
+      "hits": 0
+    }
+  ],
+  "notes": "No project-scoped lessons written to learned-behavior this retro: the strong project-level rules (category guard mechanics, verdict-cache-only gold reads) are already codified in CLAUDE.md and enforced by tests \u2014 duplicating them into another store would be noise. Transcripts for pre-September sessions were unavailable (ephemeral cloud containers); interview grounded in STATE.md + git history + user confirmation."
+}
